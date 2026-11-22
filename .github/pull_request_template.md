@@ -10,6 +10,14 @@ Closes #<issue-number>
 - <package/app>: <change>
 - <package/app>: <change>
 
+## How to test
+
+<!-- Steps a reviewer can copy and run to check this PR themselves. -->
+
+1. `git checkout <branch> && pnpm install`
+2. `pnpm test`
+3. <manual step, e.g. a command to run and the output to expect>
+
 ## How it was verified
 
 - [ ] `pnpm typecheck`: passes
