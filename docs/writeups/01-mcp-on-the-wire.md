@@ -58,7 +58,10 @@ The spike's one tool is `divide`. Its three outcomes show the most useful distin
 
 ## Proof
 
-- MCP Inspector (`--protocol-era modern`) lists and calls `divide` on the hand-written server. _(Screenshot: `assets/gate-a-inspector.png`, still to be added.)_
+- MCP Inspector (`--protocol-era modern`) lists and calls `divide` on the hand-written server. Dividing by zero comes back as a tool error, while the `tools/call` request itself completes:
+
+  ![MCP Inspector 2.16.0 connected to raw-jsonrpc-spike over stdio: divide listed, a=1 b=0 returns a tool error, protocol log shows server/discover, tools/list and tools/call completing](assets/gate-a-inspector.png)
+
 - One SDK client, pinned to 2026-07-28, passes the same 8 contract checks against the hand-written server, the SDK stdio server and the SDK HTTP server.
 
 Code: `spikes/raw-jsonrpc` (by hand) and `spikes/sdk-server` (SDK v2).
