@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+/*
+  Design tokens from the canvas mockups.
+  Color means attention: amber = waiting for a person, red = blocked or high risk.
+  Everything that is normal stays neutral.
+*/
+@theme {
+  --color-fog: #eef1f4;
+  --color-rail: #f7f9fa;
+  --color-surface: #ffffff;
+  --color-ink: #17202b;
+  --color-ink-soft: #3e4a58;
+  --color-muted: #536070;
+  --color-line: #d5dbe2;
+  --color-line-soft: #e6eaef;
+  --color-control: #c3cbd4;
+  --color-bubble: #e4e8ed;
+
+  --color-accent: #0b6b66;
+  --color-accent-hover: #084f4b;
+  --color-accent-tint: #f1f7f6;
+
+  --color-wait: #8a5300;
+  --color-wait-bg: #fff3dc;
+  --color-wait-border: #e9c98a;
+  --color-wait-ink: #5c3700;
+
+  --color-block: #b42318;
+  --color-block-bg: #fcebe9;
+  --color-block-ink: #7a1a12;
+
+  --color-code: #17202b;
+  --color-code-text: #e6ebf0;
+  --color-diff-del: #ffada6;
+  --color-diff-add: #9fe3b8;
+}
+
+/* Fonts come from next/font in app/layout.tsx */
+@theme inline {
+  --font-sans: var(--font-plex-sans), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+}
+
+@layer base {
+  body {
+    @apply bg-fog text-ink font-sans antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  a {
+    @apply text-accent hover:text-accent-hover;
+  }
+}
