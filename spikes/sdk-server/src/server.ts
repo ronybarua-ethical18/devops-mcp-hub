@@ -4,6 +4,8 @@ import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 
 const DIVIDE_BY_ZERO_HINT = "Cannot divide by zero. Call divide again with a non-zero b.";
+const OVERFLOW_HINT =
+  "The quotient is too large to represent as a number. Call divide with smaller a or larger b.";
 
 export function createServer(): McpServer {
   const server = new McpServer({ name: "sdk-spike", version: "0.0.1" });
@@ -21,7 +23,12 @@ export function createServer(): McpServer {
       if (b === 0) {
         return { content: [{ type: "text", text: DIVIDE_BY_ZERO_HINT }], isError: true };
       }
-      const structuredContent = { quotient: a / b };
+      const quotient = a / b;
+      // Finite inputs can still overflow (1e308 / 1e-308); z.number() rejects Infinity.
+      if (!Number.isFinite(quotient)) {
+        return { content: [{ type: "text", text: OVERFLOW_HINT }], isError: true };
+      }
+      const structuredContent = { quotient };
       return {
         content: [{ type: "text", text: JSON.stringify(structuredContent) }],
         structuredContent,

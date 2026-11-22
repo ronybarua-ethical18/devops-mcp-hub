@@ -39,10 +39,11 @@ function start(): {
   return { child, lines, next };
 }
 
+// Waits for 'close', not 'exit': 'close' fires only after stdout is drained, so every line is read.
 const exitCode = (c: ChildProcessWithoutNullStreams, ms: number) =>
   new Promise<number | null>((resolve, reject) => {
     const t = setTimeout(() => reject(new Error(`no exit within ${ms}ms`)), ms);
-    c.once("exit", (code) => {
+    c.once("close", (code) => {
       clearTimeout(t);
       resolve(code);
     });

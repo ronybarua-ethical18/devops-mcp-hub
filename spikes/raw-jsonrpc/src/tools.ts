@@ -17,6 +17,8 @@ export interface ToolCallResult {
 }
 
 export const DIVIDE_BY_ZERO_HINT = "Cannot divide by zero. Call divide again with a non-zero b.";
+export const OVERFLOW_HINT =
+  "The quotient is too large to represent as a number. Call divide with smaller a or larger b.";
 export const BAD_ARGS_HINT =
   'Invalid arguments: a and b must both be numbers, e.g. {"a": 6, "b": 3}.';
 
@@ -59,7 +61,11 @@ export function callTool(name: string, args: unknown): ToolCallResult | undefine
   if (!isFiniteNumber(a) || !isFiniteNumber(b)) return toolError(BAD_ARGS_HINT);
   if (b === 0) return toolError(DIVIDE_BY_ZERO_HINT);
 
-  const structuredContent = { quotient: a / b };
+  const quotient = a / b;
+  // Finite inputs can still overflow (1e308 / 1e-308); Infinity would serialize as null.
+  if (!Number.isFinite(quotient)) return toolError(OVERFLOW_HINT);
+
+  const structuredContent = { quotient };
   return {
     content: [{ type: "text", text: JSON.stringify(structuredContent) }],
     structuredContent,

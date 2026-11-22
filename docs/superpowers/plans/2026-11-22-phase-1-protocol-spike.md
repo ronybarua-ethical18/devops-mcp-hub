@@ -54,7 +54,7 @@ spikes/
 │   ├── src/server.ts           createServer(): McpServer with the same divide tool
 │   ├── src/stdio.ts            serveStdio(createServer, { legacy: "reject" })
 │   ├── src/http.ts             createMcpHandler(createServer, { legacy: "reject" }) on @hono/node-server
-│   └── test/contract.test.ts   SDK client (pinned 2026-07-28) vs raw stdio, SDK stdio, SDK HTTP
+│   └── test/contract.e2e.test.ts   SDK client (pinned 2026-07-28) vs raw stdio, SDK stdio, SDK HTTP
 docs/adr/0001-mcp-spec-revision-and-sdk-pin.md
 docs/writeups/01-mcp-on-the-wire.md
 ```
@@ -254,7 +254,7 @@ Test helper, used by every test: `req(method, params = {}, id = 1)` builds a req
 
 **Files:**
 
-- Create: `spikes/sdk-server/test/contract.test.ts`
+- Create: `spikes/sdk-server/test/contract.e2e.test.ts`
 
 **Interfaces:**
 

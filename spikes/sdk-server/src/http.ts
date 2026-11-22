@@ -12,7 +12,11 @@ const handler = createMcpHandler(createServer, { legacy: "reject" });
 const app = createMcpHonoApp();
 app.all("/mcp", (c: Context) => handler.fetch(c.req.raw, { parsedBody: c.get("parsedBody") }));
 
-const port = Number(process.env.PORT ?? 4100);
+// `||` so an empty PORT falls back too (Number("") is 0, a random port).
+const port = Number(process.env.PORT || 4100);
+if (!Number.isInteger(port) || port < 0 || port > 65535) {
+  throw new Error(`Invalid PORT: ${process.env.PORT}`);
+}
 serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, (info) => {
   console.error(`sdk-spike ready on http://127.0.0.1:${info.port}/mcp (2026-07-28 only)`);
 });

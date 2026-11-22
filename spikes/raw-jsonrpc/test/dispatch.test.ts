@@ -21,12 +21,22 @@ function req(
   });
 }
 
-// Loose view of a response for assertions.
+// Loose view of a response for assertions. Fields are optional: tests check their presence.
 type Res = {
   id: unknown;
-  result?: Record<string, any>;
+  result?: {
+    resultType?: unknown;
+    cacheScope?: unknown;
+    ttlMs?: unknown;
+    tools?: { name?: unknown }[];
+    content?: { type?: unknown; text?: unknown }[];
+    structuredContent?: unknown;
+    isError?: unknown;
+    _meta?: Record<string, { name?: unknown } | undefined>;
+  };
   error?: { code: number; message: string; data?: unknown };
 };
+const text = (res: Res): string => String(res.result?.content?.[0]?.text);
 const call = (line: string) => handleLine(line) as Res;
 
 describe("handleLine", () => {
@@ -126,7 +136,7 @@ describe("handleLine", () => {
       cacheScope: "private",
     });
     expect(typeof result?.ttlMs).toBe("number");
-    expect(result?._meta["io.modelcontextprotocol/serverInfo"].name).toBe("raw-jsonrpc-spike");
+    expect(result?._meta?.["io.modelcontextprotocol/serverInfo"]?.name).toBe("raw-jsonrpc-spike");
   });
 
   it("echoes string and number ids unchanged", () => {
@@ -141,31 +151,39 @@ describe("tools", () => {
 
   it("tools/list returns divide with cache hints", () => {
     const { result } = call(req("tools/list"));
-    expect(result?.tools[0].name).toBe("divide");
+    expect(result?.tools?.[0]?.name).toBe("divide");
     expect(result?.cacheScope).toBe("private");
     expect(typeof result?.ttlMs).toBe("number");
     expect(result?.resultType).toBe("complete");
   });
 
   it("divide returns structuredContent and a JSON text block", () => {
-    const { result } = callDivide({ a: 6, b: 3 });
-    expect(result?.structuredContent).toEqual({ quotient: 2 });
-    expect(JSON.parse(result?.content[0].text)).toEqual({ quotient: 2 });
-    expect(result?.isError).toBe(false);
+    const res = callDivide({ a: 6, b: 3 });
+    expect(res.result?.structuredContent).toEqual({ quotient: 2 });
+    expect(JSON.parse(text(res))).toEqual({ quotient: 2 });
+    expect(res.result?.isError).toBe(false);
   });
 
   it("divide by zero is a tool error, not a protocol error", () => {
     const res = callDivide({ a: 1, b: 0 });
     expect(res.error).toBeUndefined();
     expect(res.result?.isError).toBe(true);
-    expect(res.result?.content[0].text).toContain("non-zero b");
+    expect(text(res)).toContain("non-zero b");
+  });
+
+  it("a quotient that overflows to Infinity is a tool error", () => {
+    const res = callDivide({ a: 1e308, b: 1e-308 });
+    expect(res.error).toBeUndefined();
+    expect(res.result?.isError).toBe(true);
+    expect(res.result?.structuredContent).toBeUndefined();
+    expect(text(res)).toContain("too large");
   });
 
   it("wrong argument types are a tool error with a hint", () => {
     for (const args of [{ a: 6, b: "2" }, { a: 6 }]) {
-      const { result } = callDivide(args);
-      expect(result?.isError).toBe(true);
-      expect(result?.content[0].text).toContain("must both be numbers");
+      const res = callDivide(args);
+      expect(res.result?.isError).toBe(true);
+      expect(text(res)).toContain("must both be numbers");
     }
   });
 

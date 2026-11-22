@@ -30,7 +30,7 @@ function freePort(): Promise<number> {
   });
 }
 
-async function waitForHttp(url: string, ms = 10_000): Promise<void> {
+async function waitForHttp(url: string, ms = 15_000): Promise<void> {
   const deadline = Date.now() + ms;
   while (Date.now() < deadline) {
     try {
@@ -77,10 +77,11 @@ beforeAll(async () => {
   httpUrl = `http://127.0.0.1:${port}/mcp`;
   httpChild = spawn(process.execPath, [...TSX, SDK_HTTP], {
     env: { ...process.env, PORT: String(port) },
-    stdio: "ignore",
+    // Pass stderr through so a startup crash is visible in the test output.
+    stdio: ["ignore", "ignore", "inherit"],
   });
   await waitForHttp(httpUrl);
-});
+}, 20_000);
 
 afterAll(() => {
   httpChild?.kill();
@@ -113,6 +114,13 @@ describe.each(targets)("$name", (target) => {
     expect(result.isError).toBe(true);
     const first = (result.content as { type: string; text?: string }[])[0];
     expect(first?.text).toContain("non-zero b");
+  });
+
+  it("returns a tool error when the quotient overflows", async () => {
+    const result = await client.callTool({ name: "divide", arguments: { a: 1e308, b: 1e-308 } });
+    expect(result.isError).toBe(true);
+    const first = (result.content as { type: string; text?: string }[])[0];
+    expect(first?.text).toContain("too large");
   });
 
   it("returns a tool error (not a protocol error) for wrong argument types", async () => {

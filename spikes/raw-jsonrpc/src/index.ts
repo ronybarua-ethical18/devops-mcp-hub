@@ -11,7 +11,10 @@ rl.on("line", (line) => {
   if (response !== null) process.stdout.write(JSON.stringify(response) + "\n");
 });
 
-// The client closed stdin: shut down.
-rl.on("close", () => process.exit(0));
+// The client closed stdin: shut down. Let the process end on its own instead of process.exit(),
+// so stdout writes still queued (async pipes, e.g. macOS) are flushed first.
+rl.on("close", () => {
+  process.exitCode = 0;
+});
 
 console.error(`${SERVER_INFO.name} ready (${PROTOCOL_VERSION})`);
