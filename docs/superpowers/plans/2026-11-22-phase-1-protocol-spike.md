@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript (ESM), Node ≥ 22.23.4, tsx, Vitest, `@modelcontextprotocol/server@2.4.0`, `@modelcontextprotocol/client@2.4.0` (test-only in the raw spike), `zod@^4.2`, `@hono/node-server`, `@modelcontextprotocol/inspector@2.16.0`.
 
-**Spec:** Issue [#1](https://github.com/ronybarua-ethical18/devops-mcp-hub/issues/1). Blueprint `docs/reference/blueprint-v2.pdf` sections *MCP learning map* and *Roadmap → Gate A*. MCP spec revision 2026-07-28: https://modelcontextprotocol.io/specification/2026-07-28 (changelog, basic, basic/transports/stdio, server/discover, server/tools).
+**Spec:** Issue [#1](https://github.com/ronybarua-ethical18/devops-mcp-hub/issues/1). Blueprint `docs/reference/blueprint-v2.pdf` sections _MCP learning map_ and _Roadmap → Gate A_. MCP spec revision 2026-07-28: https://modelcontextprotocol.io/specification/2026-07-28 (changelog, basic, basic/transports/stdio, server/discover, server/tools).
 
 **Branch:** `1-phase-1-protocol-spike-raw-json-rpc-stdio-server-then-sdk` (created with `gh issue develop 1`). Open the PR with `Closes #1`.
 
@@ -64,10 +64,12 @@ docs/writeups/01-mcp-on-the-wire.md
 ### Task 0: Toolchain — Node floor and spike workspace
 
 **Files:**
+
 - Modify: `.nvmrc`, `package.json` (`engines.node`), `pnpm-workspace.yaml`, `README.md` (add a Branching section)
 - Create: `spikes/raw-jsonrpc/package.json`, `spikes/raw-jsonrpc/tsconfig.json`
 
 **Interfaces:**
+
 - Produces: workspace package `@hub/spike-raw-jsonrpc` with scripts `test` (`vitest run`), `typecheck` (`tsc --noEmit`), `start` (`tsx src/index.ts`).
 
 - [ ] **Step 1:** Install Node 22.23.4 or newer locally (`nvm install 22.23.4` or equivalent). Run `node -v` and expect `v22.23.4` or higher.
@@ -83,10 +85,12 @@ docs/writeups/01-mcp-on-the-wire.md
 ### Task 1: Protocol primitives
 
 **Files:**
+
 - Create: `spikes/raw-jsonrpc/src/protocol.ts`
 - Test: `spikes/raw-jsonrpc/test/dispatch.test.ts` (the builders are exercised through `handleLine` in Task 2, so there's no separate test file)
 
 **Interfaces:**
+
 - Produces:
   - `PROTOCOL_VERSION = "2026-07-28"`
   - `SUPPORTED_VERSIONS: readonly string[] = ["2026-07-28"]`
@@ -106,10 +110,12 @@ docs/writeups/01-mcp-on-the-wire.md
 ### Task 2: Dispatcher — envelope validation, discovery and routing
 
 **Files:**
+
 - Create: `spikes/raw-jsonrpc/src/dispatch.ts`
 - Test: `spikes/raw-jsonrpc/test/dispatch.test.ts`
 
 **Interfaces:**
+
 - Consumes: everything from Task 1. From Task 3 it uses `listTools(): ToolDefinition[]` and `callTool(name, args): ToolCallResult | undefined`. Until Task 3 exists, stub them in `tools.ts` as `[]` and `undefined`.
 - Produces: `handleLine(line: string): JsonRpcResponse | null`. It returns `null` for notifications and blank lines.
 
@@ -143,6 +149,7 @@ Test helper, used by every test: `req(method, params = {}, id = 1)` builds a req
   9. Route `server/discover`, `tools/list` and `tools/call`. Anything else gets `-32601`.
 
   Use `ttlMs: 3_600_000` for discover. Wrap routing in try/catch and map any throw to `-32603`, logging the error to stderr.
+
 - [ ] **Step 4:** Run the tests and expect them all to pass.
 - [ ] **Step 5: Commit:** `feat(spike): hand-written JSON-RPC dispatcher with server/discover`
 
@@ -151,11 +158,13 @@ Test helper, used by every test: `req(method, params = {}, id = 1)` builds a req
 ### Task 3: The `divide` tool — tool errors vs protocol errors
 
 **Files:**
+
 - Create: `spikes/raw-jsonrpc/src/tools.ts`, replacing the Task 2 stub
 - Modify: `spikes/raw-jsonrpc/src/dispatch.ts` (wire up `tools/list` and `tools/call`)
 - Test: `spikes/raw-jsonrpc/test/dispatch.test.ts` (new `describe("tools")` block)
 
 **Interfaces:**
+
 - Produces:
   - `ToolDefinition { name; title?; description; inputSchema; outputSchema?; annotations? }`
   - `ToolCallResult { content: { type: "text"; text: string }[]; structuredContent?: unknown; isError: boolean }`
@@ -187,10 +196,12 @@ Test helper, used by every test: `req(method, params = {}, id = 1)` builds a req
 ### Task 4: stdio loop and Gate A verification with Inspector
 
 **Files:**
+
 - Create: `spikes/raw-jsonrpc/src/index.ts`, `spikes/raw-jsonrpc/test/stdio.e2e.test.ts`
 - Modify: `spikes/raw-jsonrpc/package.json` (add an `inspect` script)
 
 **Interfaces:**
+
 - Consumes: `handleLine` from Task 2.
 - Produces: a runnable server, `tsx spikes/raw-jsonrpc/src/index.ts`.
 
@@ -216,9 +227,11 @@ Test helper, used by every test: `req(method, params = {}, id = 1)` builds a req
 ### Task 5: SDK v2 rebuild — stdio and `createMcpHandler`
 
 **Files:**
+
 - Create: `spikes/sdk-server/{package.json,tsconfig.json}`, `src/server.ts`, `src/stdio.ts`, `src/http.ts`
 
 **Interfaces:**
+
 - Produces:
   - `createServer(): McpServer`, with `name: "sdk-spike"` and `version: "0.0.1"`.
   - Scripts: `start:stdio` (`tsx src/stdio.ts`), `start:http` (`tsx src/http.ts`, serving `POST /mcp` on `PORT`, default `4100`), `test` and `typecheck`.
@@ -240,9 +253,11 @@ Test helper, used by every test: `req(method, params = {}, id = 1)` builds a req
 ### Task 6: Contract test — one client, three servers
 
 **Files:**
+
 - Create: `spikes/sdk-server/test/contract.test.ts`
 
 **Interfaces:**
+
 - Consumes: the raw server (`spikes/raw-jsonrpc/src/index.ts`) and the SDK stdio and HTTP entry points.
 
 - [ ] **Step 1: Write the test.** Use `describe.each` over three targets: `raw-stdio`, `sdk-stdio` and `sdk-http`.
@@ -261,6 +276,7 @@ Test helper, used by every test: `req(method, params = {}, id = 1)` builds a req
 ### Task 7: ADR and write-up #1
 
 **Files:**
+
 - Create: `docs/adr/0001-mcp-spec-revision-and-sdk-pin.md`, `docs/writeups/01-mcp-on-the-wire.md`
 
 - [ ] **Step 1: Write the ADR** with Context / Decision / Consequences sections. It covers:
