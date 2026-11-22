@@ -27,6 +27,10 @@ docs/threat-model.md       MCP-specific threat table
 tests/                     protocol, authorization, security, e2e
 ```
 
+## Branching
+
+Each roadmap phase ships on its own branch, named `<issue-number>-<issue-title-slug>` and created with `gh issue develop <n> --checkout`, so the branch is linked to its issue. Each PR closes its issue (`Closes #<n>`).
+
 ## Roadmap gates
 
 - **A (week 1):** MCP Inspector lists and calls a tool on a hand-written, SDK-free server.

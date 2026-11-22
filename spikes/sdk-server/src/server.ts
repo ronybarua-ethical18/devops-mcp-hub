@@ -1,0 +1,42 @@
+// Same divide tool as spikes/raw-jsonrpc, on the official SDK v2. The SDK generates
+// inputSchema/outputSchema JSON Schema from Zod and handles the envelope, _meta and errors.
+import { McpServer } from "@modelcontextprotocol/server";
+import * as z from "zod/v4";
+
+const DIVIDE_BY_ZERO_HINT = "Cannot divide by zero. Call divide again with a non-zero b.";
+const OVERFLOW_HINT =
+  "The quotient is too large to represent as a number. Call divide with smaller a or larger b.";
+
+export function createServer(): McpServer {
+  const server = new McpServer({ name: "sdk-spike", version: "0.0.1" });
+
+  server.registerTool(
+    "divide",
+    {
+      title: "Divide two numbers",
+      description:
+        "Divides a by b and returns the quotient. Use it for one division of two numbers. Don't use it for other arithmetic or whole expressions: this server has no tool for those, so work them out without a tool.",
+      // strictObject: advertises additionalProperties: false and rejects extra keys, like the raw server.
+      inputSchema: z.strictObject({ a: z.number(), b: z.number() }),
+      outputSchema: z.object({ quotient: z.number() }),
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ a, b }) => {
+      if (b === 0) {
+        return { content: [{ type: "text", text: DIVIDE_BY_ZERO_HINT }], isError: true };
+      }
+      const quotient = a / b;
+      // Finite inputs can still overflow (1e308 / 1e-308); z.number() rejects Infinity.
+      if (!Number.isFinite(quotient)) {
+        return { content: [{ type: "text", text: OVERFLOW_HINT }], isError: true };
+      }
+      const structuredContent = { quotient };
+      return {
+        content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+        structuredContent,
+      };
+    },
+  );
+
+  return server;
+}
