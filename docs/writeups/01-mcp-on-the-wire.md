@@ -53,12 +53,12 @@ The spike's one tool is `divide`. Its three outcomes show the most useful distin
 - **Inspector defaults to the old protocol.** Inspector 2.16.0 sends `initialize` unless you pass `--protocol-era modern`. It also needs Node 22.23.4 or newer.
 - **The SDK client defaults to the old protocol too.** Pin it: `versionNegotiation: { mode: { pin: "2026-07-28" } }`.
 - **There are two stdio entry points in SDK v2.** `serveStdio(factory)` speaks 2026-07-28. The familiar `server.connect(new StdioServerTransport())` speaks only the legacy protocol.
-- **Every result needs `resultType: "complete"`.** Removing it from my hand-written server broke 6 of the 7 contract tests against it (only the unknown-tool error still passed), while the SDK servers kept passing.
+- **Every result needs `resultType: "complete"`.** Removing it from my hand-written server broke 7 of the 8 contract tests against it (only the unknown-tool error still passed), while the SDK servers kept passing.
 - **List results carry cache hints** (`ttlMs`, `cacheScope`). `ping` is gone.
 
 ## Proof
 
 - MCP Inspector (`--protocol-era modern`) lists and calls `divide` on the hand-written server. _(Screenshot: `assets/gate-a-inspector.png`, still to be added.)_
-- One SDK client, pinned to 2026-07-28, passes the same 7 contract checks against the hand-written server, the SDK stdio server and the SDK HTTP server.
+- One SDK client, pinned to 2026-07-28, passes the same 8 contract checks against the hand-written server, the SDK stdio server and the SDK HTTP server.
 
 Code: `spikes/raw-jsonrpc` (by hand) and `spikes/sdk-server` (SDK v2).

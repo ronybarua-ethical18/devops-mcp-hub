@@ -19,16 +19,31 @@ export interface ToolCallResult {
 export const DIVIDE_BY_ZERO_HINT = "Cannot divide by zero. Call divide again with a non-zero b.";
 export const OVERFLOW_HINT =
   "The quotient is too large to represent as a number. Call divide with smaller a or larger b.";
-export const BAD_ARGS_HINT =
-  'Invalid arguments: a and b must both be numbers, e.g. {"a": 6, "b": 3}.';
-export const EXTRA_ARGS_HINT =
-  'Invalid arguments: pass only a and b, e.g. {"a": 6, "b": 3}. Remove any other keys.';
 const ALLOWED_ARGS = new Set(["a", "b"]);
+// Extra key names are echoed back to the model; bound how many and how long.
+const MAX_ECHOED_KEYS = 3;
+const MAX_KEY_LENGTH = 40;
+
+/** One hint covering every argument problem, so a single retry can fix them all. */
+function badArgsHint(badTypes: boolean, extra: string[]): string {
+  const problems: string[] = [];
+  if (badTypes) problems.push("a and b must both be numbers");
+  if (extra.length > 0) {
+    const shown = extra
+      .slice(0, MAX_ECHOED_KEYS)
+      .map((k) => JSON.stringify(k.slice(0, MAX_KEY_LENGTH)));
+    const more =
+      extra.length > MAX_ECHOED_KEYS ? ` and ${extra.length - MAX_ECHOED_KEYS} more` : "";
+    problems.push(`pass only a and b (remove ${shown.join(", ")}${more})`);
+  }
+  return `Invalid arguments: ${problems.join("; ")}, e.g. {"a": 6, "b": 3}.`;
+}
 
 const divide: ToolDefinition = {
   name: "divide",
   title: "Divide two numbers",
-  description: "Divides a by b and returns the quotient.",
+  description:
+    "Divides a by b and returns the quotient. Use it for one division of two numbers. Don't use it for other arithmetic or whole expressions: this server has no tool for those, so work them out without a tool.",
   inputSchema: {
     type: "object",
     properties: { a: { type: "number" }, b: { type: "number" } },
@@ -59,9 +74,11 @@ export function callTool(name: string, args: unknown): ToolCallResult | undefine
 
   const input = (typeof args === "object" && args !== null ? args : {}) as Record<string, unknown>;
   const { a, b } = input;
-  if (!isFiniteNumber(a) || !isFiniteNumber(b)) return toolError(BAD_ARGS_HINT);
   // inputSchema says additionalProperties: false, so enforce it rather than silently ignoring keys.
-  if (Object.keys(input).some((k) => !ALLOWED_ARGS.has(k))) return toolError(EXTRA_ARGS_HINT);
+  const extra = Object.keys(input).filter((k) => !ALLOWED_ARGS.has(k));
+  if (!isFiniteNumber(a) || !isFiniteNumber(b) || extra.length > 0) {
+    return toolError(badArgsHint(!isFiniteNumber(a) || !isFiniteNumber(b), extra));
+  }
   if (b === 0) return toolError(DIVIDE_BY_ZERO_HINT);
 
   const quotient = a / b;

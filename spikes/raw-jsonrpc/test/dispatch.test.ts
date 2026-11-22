@@ -195,6 +195,23 @@ describe("tools", () => {
     expect(text(res)).toContain("only a and b");
   });
 
+  it("reports wrong types and extra keys together, so one retry fixes both", () => {
+    const res = callDivide({ a: 6, c: 1 });
+    expect(res.result?.isError).toBe(true);
+    expect(text(res)).toContain("must both be numbers");
+    expect(text(res)).toContain("only a and b");
+    expect(text(res)).toContain("c");
+  });
+
+  it("bounds how many extra key names, and how much of each, it echoes back", () => {
+    const long = "x".repeat(500);
+    const res = callDivide({ a: 6, b: 3, [long]: 1, k2: 1, k3: 1, k4: 1, k5: 1 });
+    expect(res.result?.isError).toBe(true);
+    expect(text(res)).not.toContain("x".repeat(41));
+    expect(text(res)).toContain("and 2 more");
+    expect(text(res).length).toBeLessThan(250);
+  });
+
   it("unknown tool is protocol error -32602", () => {
     expect(call(req("tools/call", { name: "nope", arguments: {} })).error?.code).toBe(-32602);
   });

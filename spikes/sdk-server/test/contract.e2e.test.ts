@@ -104,6 +104,12 @@ describe.each(targets)("$name", (target) => {
     expect(divide?.annotations?.readOnlyHint).toBe(true);
   });
 
+  it("describes when not to use divide", async () => {
+    const { tools } = await client.listTools();
+    const divide = tools.find((t) => t.name === "divide");
+    expect(divide?.description).toContain("Don't use it for other arithmetic");
+  });
+
   it("returns structuredContent for 6 / 3", async () => {
     const result = await client.callTool({ name: "divide", arguments: { a: 6, b: 3 } });
     expect(result.structuredContent).toEqual({ quotient: 2 });
