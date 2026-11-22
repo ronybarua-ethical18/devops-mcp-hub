@@ -187,6 +187,14 @@ describe("tools", () => {
     }
   });
 
+  it("extra argument keys are a tool error, matching additionalProperties: false", () => {
+    const res = callDivide({ a: 6, b: 3, c: 1 });
+    expect(res.error).toBeUndefined();
+    expect(res.result?.isError).toBe(true);
+    expect(res.result?.structuredContent).toBeUndefined();
+    expect(text(res)).toContain("only a and b");
+  });
+
   it("unknown tool is protocol error -32602", () => {
     expect(call(req("tools/call", { name: "nope", arguments: {} })).error?.code).toBe(-32602);
   });

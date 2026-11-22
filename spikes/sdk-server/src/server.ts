@@ -15,7 +15,8 @@ export function createServer(): McpServer {
     {
       title: "Divide two numbers",
       description: "Divides a by b and returns the quotient.",
-      inputSchema: z.object({ a: z.number(), b: z.number() }),
+      // strictObject: advertises additionalProperties: false and rejects extra keys, like the raw server.
+      inputSchema: z.strictObject({ a: z.number(), b: z.number() }),
       outputSchema: z.object({ quotient: z.number() }),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },

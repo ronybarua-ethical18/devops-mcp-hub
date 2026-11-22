@@ -43,7 +43,7 @@ async function waitForHttp(url: string, ms = 15_000): Promise<void> {
   throw new Error(`server at ${url} did not start within ${ms}ms`);
 }
 
-type Target = { name: string; connect: () => Promise<Client>; cleanup?: () => void };
+type Target = { name: string; connect: () => Promise<Client> };
 
 let httpChild: ChildProcess | undefined;
 let httpUrl = "";
@@ -129,6 +129,15 @@ describe.each(targets)("$name", (target) => {
     expect(result.isError).toBe(true);
     const first = (result.content as { type: string; text?: string }[])[0];
     expect(first?.text).toBeTruthy();
+  });
+
+  it("advertises a strict input schema and enforces it", async () => {
+    const { tools } = await client.listTools();
+    const divide = tools.find((t) => t.name === "divide");
+    expect(divide?.inputSchema.additionalProperties).toBe(false);
+    const result = await client.callTool({ name: "divide", arguments: { a: 6, b: 3, c: 1 } });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toBeUndefined();
   });
 
   it("rejects an unknown tool with -32602", async () => {

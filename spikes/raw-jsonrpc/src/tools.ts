@@ -21,6 +21,9 @@ export const OVERFLOW_HINT =
   "The quotient is too large to represent as a number. Call divide with smaller a or larger b.";
 export const BAD_ARGS_HINT =
   'Invalid arguments: a and b must both be numbers, e.g. {"a": 6, "b": 3}.';
+export const EXTRA_ARGS_HINT =
+  'Invalid arguments: pass only a and b, e.g. {"a": 6, "b": 3}. Remove any other keys.';
+const ALLOWED_ARGS = new Set(["a", "b"]);
 
 const divide: ToolDefinition = {
   name: "divide",
@@ -54,11 +57,11 @@ export function listTools(): ToolDefinition[] {
 export function callTool(name: string, args: unknown): ToolCallResult | undefined {
   if (name !== divide.name) return undefined;
 
-  const { a, b } = (typeof args === "object" && args !== null ? args : {}) as Record<
-    string,
-    unknown
-  >;
+  const input = (typeof args === "object" && args !== null ? args : {}) as Record<string, unknown>;
+  const { a, b } = input;
   if (!isFiniteNumber(a) || !isFiniteNumber(b)) return toolError(BAD_ARGS_HINT);
+  // inputSchema says additionalProperties: false, so enforce it rather than silently ignoring keys.
+  if (Object.keys(input).some((k) => !ALLOWED_ARGS.has(k))) return toolError(EXTRA_ARGS_HINT);
   if (b === 0) return toolError(DIVIDE_BY_ZERO_HINT);
 
   const quotient = a / b;

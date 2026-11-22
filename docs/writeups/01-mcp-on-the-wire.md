@@ -2,7 +2,7 @@
 
 > **Draft for Rony to rewrite in their own words.** Every message below was captured from `spikes/raw-jsonrpc`.
 
-Before I let a library hide the Model Context Protocol from me, I wrote a server by hand: about 150 lines of TypeScript and no SDK. Then I rebuilt it on the official SDK and pointed one test client at both. Here's what I learned about MCP spec revision **2026-07-28**.
+Before I let a library hide the Model Context Protocol from me, I wrote a server by hand: about 290 lines of TypeScript and no SDK. Then I rebuilt it on the official SDK and pointed one test client at both. Here's what I learned about MCP spec revision **2026-07-28**.
 
 ## One request's life on stdio
 
@@ -45,7 +45,7 @@ The spike's one tool is `divide`. Its three outcomes show the most useful distin
 ```
 
 - **Success:** returns `structuredContent` that matches the tool's `outputSchema`, plus the same data as text for hosts that ignore structure.
-- **A tool error** (`isError: true`) is still a _result_. The model reads it, and the hint tells it how to fix the call. Divide-by-zero and wrong argument types go here.
+- **A tool error** (`isError: true`) is still a _result_. The model reads it, and the hint tells it how to fix the call. Divide-by-zero, overflow, wrong argument types and extra argument keys go here.
 - **A protocol error** (`error`) means the request itself was wrong, such as an unknown tool, a bad envelope or an unsupported version. The client gets an exception, not something the model can recover from.
 
 ## Gotchas that 2025 tutorials won't warn you about
@@ -53,12 +53,12 @@ The spike's one tool is `divide`. Its three outcomes show the most useful distin
 - **Inspector defaults to the old protocol.** Inspector 2.16.0 sends `initialize` unless you pass `--protocol-era modern`. It also needs Node 22.23.4 or newer.
 - **The SDK client defaults to the old protocol too.** Pin it: `versionNegotiation: { mode: { pin: "2026-07-28" } }`.
 - **There are two stdio entry points in SDK v2.** `serveStdio(factory)` speaks 2026-07-28. The familiar `server.connect(new StdioServerTransport())` speaks only the legacy protocol.
-- **Every result needs `resultType: "complete"`.** Removing it from my hand-written server broke 3 of 4 contract tests, while the SDK servers kept passing.
+- **Every result needs `resultType: "complete"`.** Removing it from my hand-written server broke 6 of the 7 contract tests against it (only the unknown-tool error still passed), while the SDK servers kept passing.
 - **List results carry cache hints** (`ttlMs`, `cacheScope`). `ping` is gone.
 
 ## Proof
 
 - MCP Inspector (`--protocol-era modern`) lists and calls `divide` on the hand-written server. _(Screenshot: `assets/gate-a-inspector.png`, still to be added.)_
-- One SDK client, pinned to 2026-07-28, passes the same 4 contract checks against the hand-written server, the SDK stdio server and the SDK HTTP server.
+- One SDK client, pinned to 2026-07-28, passes the same 7 contract checks against the hand-written server, the SDK stdio server and the SDK HTTP server.
 
 Code: `spikes/raw-jsonrpc` (by hand) and `spikes/sdk-server` (SDK v2).
