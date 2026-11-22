@@ -43,3 +43,9 @@ Thumbs.db
 
 # local Claude Code settings
 .claude/settings.local.json
+
+# generated Prisma client
+packages/db/src/generated/
+
+# superpowers executor scratch
+.superpowers/

@@ -4,6 +4,8 @@ packages:
   - spikes/*
 
 allowBuilds:
+  "@prisma/engines": false
   esbuild: true
+  prisma: false
   sharp: false
   unrs-resolver: false

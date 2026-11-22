@@ -1,0 +1,330 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum MembershipRole {
+  owner
+}
+
+enum Provider {
+  github
+  vercel
+  sentry
+  postgres
+}
+
+enum IntegrationStatus {
+  active
+  revoked
+  error
+}
+
+enum PolicyEffect {
+  allow
+  deny
+  require_approval
+}
+
+// "Not exposed" tools have no enum value: no MCP tool exists for them.
+enum RiskTier {
+  read
+  low_write
+  high_write
+}
+
+enum ToolCallStatus {
+  ok
+  error
+  denied
+}
+
+enum ProposalStatus {
+  pending
+  approved
+  rejected
+  expired
+  committed
+}
+
+enum ApprovalChannel {
+  dashboard
+  elicitation
+}
+
+enum ApprovalDecision {
+  approve
+  reject
+}
+
+enum WorkflowStatus {
+  pending
+  running
+  succeeded
+  failed
+}
+
+// ---------------------------------------------------------------------------
+// Global tables (no org_id)
+// ---------------------------------------------------------------------------
+
+model User {
+  id          String       @id @default(uuid()) @db.Uuid
+  email       String       @unique
+  name        String?
+  createdAt   DateTime     @default(now()) @map("created_at")
+  memberships Membership[]
+  toolCalls   ToolCall[]
+
+  @@map("users")
+}
+
+model Organization {
+  id              String              @id @default(uuid()) @db.Uuid
+  name            String
+  slug            String              @unique
+  createdAt       DateTime            @default(now()) @map("created_at")
+  memberships     Membership[]
+  projects        Project[]
+  connectionRows  ProjectConnection[]
+  integrationRows Integration[]
+  credentialRows  Credential[]
+  policyRows      ToolPolicy[]
+  toolCallRows    ToolCall[]
+  proposalRows    Proposal[]
+  approvalRows    Approval[]
+  runRows         WorkflowRun[]
+  stepRows        WorkflowStep[]
+  auditRows       AuditEvent[]
+
+  @@map("organizations")
+}
+
+model McpClient {
+  id          String     @id @default(uuid()) @db.Uuid
+  // Client ID metadata document URL.
+  clientId    String     @unique @map("client_id")
+  name        String?
+  firstSeenAt DateTime   @default(now()) @map("first_seen_at")
+  lastSeenAt  DateTime   @default(now()) @map("last_seen_at")
+  toolCalls   ToolCall[]
+
+  @@map("mcp_clients")
+}
+
+// ---------------------------------------------------------------------------
+// Tenant tables (org_id + index on every one)
+// ---------------------------------------------------------------------------
+
+// One org per user in the MVP: user_id is unique and the only role is owner.
+model Membership {
+  id           String         @id @default(uuid()) @db.Uuid
+  orgId        String         @map("org_id") @db.Uuid
+  userId       String         @unique @map("user_id") @db.Uuid
+  role         MembershipRole @default(owner)
+  createdAt    DateTime       @default(now()) @map("created_at")
+  organization Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("memberships")
+}
+
+model Project {
+  id           String              @id @default(uuid()) @db.Uuid
+  orgId        String              @map("org_id") @db.Uuid
+  name         String
+  slug         String
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+  organization Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  connections  ProjectConnection[]
+  toolPolicies ToolPolicy[]
+
+  @@unique([orgId, slug])
+  @@index([orgId])
+  @@map("projects")
+}
+
+model Integration {
+  id                String              @id @default(uuid()) @db.Uuid
+  orgId             String              @map("org_id") @db.Uuid
+  provider          Provider
+  status            IntegrationStatus   @default(active)
+  externalAccountId String?             @map("external_account_id")
+  scopes            String[]
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  organization      Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  credentials       Credential[]
+  connections       ProjectConnection[]
+
+  @@index([orgId])
+  @@map("integrations")
+}
+
+// Links a project to the provider resource it covers (repo, Vercel project, Sentry project...).
+model ProjectConnection {
+  id            String       @id @default(uuid()) @db.Uuid
+  orgId         String       @map("org_id") @db.Uuid
+  projectId     String       @map("project_id") @db.Uuid
+  integrationId String       @map("integration_id") @db.Uuid
+  externalRef   String       @map("external_ref")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  organization  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  integration   Integration  @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, integrationId, externalRef])
+  @@index([orgId])
+  @@map("project_connections")
+}
+
+// AES-256-GCM envelope encryption: ciphertext (data key), iv, wrapped_dek (master key).
+model Credential {
+  id            String       @id @db.Uuid
+  orgId         String       @map("org_id") @db.Uuid
+  integrationId String       @map("integration_id") @db.Uuid
+  ciphertext    Bytes
+  iv            Bytes
+  wrappedDek    Bytes        @map("wrapped_dek")
+  keyVersion    Int          @map("key_version")
+  expiresAt     DateTime?    @map("expires_at")
+  rotatedAt     DateTime?    @map("rotated_at")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  organization  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  integration   Integration  @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("credentials")
+}
+
+model ToolPolicy {
+  id           String       @id @default(uuid()) @db.Uuid
+  orgId        String       @map("org_id") @db.Uuid
+  projectId    String       @map("project_id") @db.Uuid
+  toolName     String       @map("tool_name")
+  effect       PolicyEffect
+  riskTier     RiskTier     @map("risk_tier")
+  constraints  Json         @default("{}")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, toolName])
+  @@index([orgId])
+  @@map("tool_policies")
+}
+
+// Retention: tool_calls are kept 30 days.
+model ToolCall {
+  id           String         @id @default(uuid()) @db.Uuid
+  orgId        String         @map("org_id") @db.Uuid
+  userId       String?        @map("user_id") @db.Uuid
+  mcpClientId  String?        @map("mcp_client_id") @db.Uuid
+  toolName     String         @map("tool_name")
+  argsHash     String         @map("args_hash")
+  status       ToolCallStatus
+  latencyMs    Int            @map("latency_ms")
+  resultBytes  Int            @map("result_bytes")
+  traceId      String         @map("trace_id")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  organization Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user         User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  mcpClient    McpClient?     @relation(fields: [mcpClientId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, createdAt])
+  @@index([traceId])
+  @@map("tool_calls")
+}
+
+// Retention: proposals are deleted 7 days after use or expiry.
+model Proposal {
+  id           String         @id @default(uuid()) @db.Uuid
+  orgId        String         @map("org_id") @db.Uuid
+  toolName     String         @map("tool_name")
+  payload      Json
+  payloadHash  String         @map("payload_hash")
+  status       ProposalStatus @default(pending)
+  requestedBy  String         @map("requested_by")
+  expiresAt    DateTime       @map("expires_at")
+  usedAt       DateTime?      @map("used_at")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  organization Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  approvals    Approval[]
+
+  @@index([orgId])
+  @@map("proposals")
+}
+
+// Bound to a proposal, not to a workflow run.
+model Approval {
+  id           String           @id @default(uuid()) @db.Uuid
+  orgId        String           @map("org_id") @db.Uuid
+  proposalId   String           @map("proposal_id") @db.Uuid
+  approverId   String           @map("approver_id")
+  channel      ApprovalChannel
+  decision     ApprovalDecision
+  decidedAt    DateTime         @default(now()) @map("decided_at")
+  organization Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  proposal     Proposal         @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("approvals")
+}
+
+model WorkflowRun {
+  id           String         @id @default(uuid()) @db.Uuid
+  orgId        String         @map("org_id") @db.Uuid
+  status       WorkflowStatus @default(pending)
+  traceId      String         @map("trace_id")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+  organization Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  steps        WorkflowStep[]
+
+  @@index([orgId])
+  @@map("workflow_runs")
+}
+
+model WorkflowStep {
+  id             String         @id @default(uuid()) @db.Uuid
+  orgId          String         @map("org_id") @db.Uuid
+  runId          String         @map("run_id") @db.Uuid
+  name           String
+  status         WorkflowStatus @default(pending)
+  attempts       Int            @default(0)
+  idempotencyKey String         @map("idempotency_key")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  organization   Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  run            WorkflowRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, idempotencyKey])
+  @@index([orgId])
+  @@map("workflow_steps")
+}
+
+// Append-only: a database trigger rejects UPDATE and DELETE (see migrations).
+// Retention: audit_events are kept 1 year; a later phase's purge job will use a privileged function.
+model AuditEvent {
+  id           String       @id @default(uuid()) @db.Uuid
+  orgId        String       @map("org_id") @db.Uuid
+  actorId      String       @map("actor_id")
+  action       String
+  target       String
+  outcome      String
+  traceId      String       @map("trace_id")
+  metadata     Json?
+  createdAt    DateTime     @default(now()) @map("created_at")
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  @@index([orgId, createdAt])
+  @@index([traceId])
+  @@map("audit_events")
+}
