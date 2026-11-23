@@ -123,8 +123,21 @@ function checkWhere(where: unknown, orgId: string, scopeKey: ScopeKey): void {
       for (const part of Array.isArray(value) ? value : [value]) checkWhere(part, orgId, scopeKey);
     } else if (isRelationField(key)) {
       violation(`relation filter "${key}" is not allowed on the tenant client`);
+    } else if (isObj(value) && Object.hasOwn(value, scopeKey)) {
+      // A compound unique key such as orgId_slug: { orgId, slug } carries the org inside it.
+      if (value[scopeKey] !== orgId) {
+        violation(`${scopeKey} in compound key "${key}" does not match the tenant scope`);
+      }
     }
   }
+}
+
+/** Check a cursor like a filter and pin it to the scope, so another org's row matches nothing. */
+function scopeCursor(input: Obj, orgId: string, scopeKey: ScopeKey): Obj {
+  const cursor = input["cursor"];
+  if (cursor === undefined) return {};
+  checkWhere(cursor, orgId, scopeKey);
+  return { cursor: { ...(cursor as Obj), [scopeKey]: orgId } };
 }
 
 function checkData(data: unknown, orgId: string, scopeKey: ScopeKey = "orgId"): void {
@@ -186,7 +199,7 @@ export function scopeArgs(model: string, operation: string, args: unknown, orgId
     checkWhere(input["where"], orgId, "id");
     if (input["data"] !== undefined) checkData(input["data"], orgId, "id");
     const where = isObj(input["where"]) ? input["where"] : {};
-    return { ...input, where: { ...where, id: orgId } };
+    return { ...input, ...scopeCursor(input, orgId, "id"), where: { ...where, id: orgId } };
   }
 
   if (!TENANT_MODELS.has(model)) {
@@ -198,7 +211,7 @@ export function scopeArgs(model: string, operation: string, args: unknown, orgId
     checkWhere(input["where"], orgId, "orgId");
     if (input["data"] !== undefined) checkData(input["data"], orgId);
     const where = isObj(input["where"]) ? input["where"] : {};
-    return { ...input, where: { ...where, orgId } };
+    return { ...input, ...scopeCursor(input, orgId, "orgId"), where: { ...where, orgId } };
   }
 
   if (CREATE_OPERATIONS.has(operation)) {

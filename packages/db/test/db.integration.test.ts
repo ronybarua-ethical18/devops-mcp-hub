@@ -60,13 +60,19 @@ describe.skipIf(!url)("tenant isolation and credentials against Postgres", () =>
     const plaintext = `ghp_${randomUUID()}`;
     const a = forOrg(prisma, ids.orgA, deps);
     const { id } = await a.credentials.store({ integrationId: ids.integrationA, plaintext });
-    expect(await a.credentials.reveal(id)).toBe(plaintext);
+    const ctx = { actorId: "u1", traceId: run };
+    expect(await a.credentials.reveal(id, ctx)).toBe(plaintext);
+    expect(
+      await prisma.auditEvent.count({
+        where: { orgId: ids.orgA, action: "credential.reveal", target: id },
+      }),
+    ).toBe(1);
 
     const row = await prisma.credential.findUniqueOrThrow({ where: { id } });
     expect(Buffer.from(row.ciphertext).includes(Buffer.from(plaintext))).toBe(false);
     expect(row.keyVersion).toBe(1);
 
-    expect(await forOrg(prisma, ids.orgB, deps).credentials.reveal(id)).toBeNull();
+    expect(await forOrg(prisma, ids.orgB, deps).credentials.reveal(id, ctx)).toBeNull();
   });
 
   it("refuses to attach a credential to another org's integration", async () => {
@@ -94,6 +100,12 @@ describe.skipIf(!url)("tenant isolation and credentials against Postgres", () =>
       // P2003 is Prisma's foreign-key violation: the database refused it, not some other error.
     ).rejects.toMatchObject({ code: "P2003" });
     expect(await prisma.toolPolicy.count({ where: { orgId: ids.orgB } })).toBe(0);
+  });
+
+  it("ignores a cursor that points at another org's row", async () => {
+    const b = createTenantClient(prisma, ids.orgB);
+    await prisma.project.create({ data: { orgId: ids.orgB, name: "b", slug: `b-${run}` } });
+    expect(await b.project.findMany({ cursor: { id: ids.projectA }, take: 5 })).toEqual([]);
   });
 
   it("forces organization queries onto the scope's own row", async () => {
