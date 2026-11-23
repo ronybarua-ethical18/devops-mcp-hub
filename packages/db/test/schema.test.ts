@@ -94,6 +94,46 @@ describe("schema.prisma", () => {
     expect([...relations].sort()).toEqual([...NON_TENANT_RELATION_FIELDS].sort());
   });
 
+  it("binds every relation between tenant tables to the same org with a composite key", () => {
+    const pairs: string[] = [];
+    for (const model of tenantModels) {
+      for (const field of model.fields) {
+        if (!TENANT_MODELS.has(field.type) || !field.line.includes("@relation(")) continue;
+        pairs.push(`${model.name}.${field.name}`);
+        expect(field.line, `${model.name}.${field.name}`).toMatch(
+          /@relation\(fields: \[orgId, \w+\], references: \[orgId, id\]/,
+        );
+        expect(
+          byName(field.type).lines.some((l) => l.startsWith("@@unique([orgId, id])")),
+          `${field.type} @@unique([orgId, id])`,
+        ).toBe(true);
+      }
+    }
+    expect(pairs.sort()).toEqual(
+      [
+        "Approval.proposal",
+        "Credential.integration",
+        "ProjectConnection.integration",
+        "ProjectConnection.project",
+        "ToolPolicy.project",
+        "WorkflowStep.run",
+      ].sort(),
+    );
+  });
+
+  it("enforces the composite keys in a migration", () => {
+    const migrations = join(root, "prisma", "migrations");
+    const sql = readdirSync(migrations, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => readFileSync(join(migrations, d.name, "migration.sql"), "utf8"))
+      .join("\n");
+    for (const column of ["project_id", "integration_id", "proposal_id", "run_id"]) {
+      expect(sql, column).toMatch(
+        new RegExp(`FOREIGN KEY \\("org_id", "${column}"\\) REFERENCES "\\w+"\\("org_id", "id"\\)`),
+      );
+    }
+  });
+
   it("limits memberships to one owner row per user", () => {
     const membership = byName("Membership");
     expect(membership.fields.find((f) => f.name === "userId")?.line).toContain("@unique");

@@ -146,6 +146,8 @@ model Project {
   toolPolicies ToolPolicy[]
 
   @@unique([orgId, slug])
+  // Lets child rows reference (org_id, id), so a child can never point at another org.
+  @@unique([orgId, id])
   @@index([orgId])
   @@map("projects")
 }
@@ -163,6 +165,8 @@ model Integration {
   credentials       Credential[]
   connections       ProjectConnection[]
 
+  // Lets child rows reference (org_id, id), so a child can never point at another org.
+  @@unique([orgId, id])
   @@index([orgId])
   @@map("integrations")
 }
@@ -176,8 +180,8 @@ model ProjectConnection {
   externalRef   String       @map("external_ref")
   createdAt     DateTime     @default(now()) @map("created_at")
   organization  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  integration   Integration  @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  project       Project      @relation(fields: [orgId, projectId], references: [orgId, id], onDelete: Cascade)
+  integration   Integration  @relation(fields: [orgId, integrationId], references: [orgId, id], onDelete: Cascade)
 
   @@unique([projectId, integrationId, externalRef])
   @@index([orgId])
@@ -197,7 +201,7 @@ model Credential {
   rotatedAt     DateTime?    @map("rotated_at")
   createdAt     DateTime     @default(now()) @map("created_at")
   organization  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  integration   Integration  @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  integration   Integration  @relation(fields: [orgId, integrationId], references: [orgId, id], onDelete: Cascade)
 
   @@index([orgId])
   @@map("credentials")
@@ -214,7 +218,7 @@ model ToolPolicy {
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @updatedAt @map("updated_at")
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [orgId, projectId], references: [orgId, id], onDelete: Cascade)
 
   @@unique([projectId, toolName])
   @@index([orgId])
@@ -258,6 +262,8 @@ model Proposal {
   organization Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
   approvals    Approval[]
 
+  // Lets child rows reference (org_id, id), so a child can never point at another org.
+  @@unique([orgId, id])
   @@index([orgId])
   @@map("proposals")
 }
@@ -272,7 +278,7 @@ model Approval {
   decision     ApprovalDecision
   decidedAt    DateTime         @default(now()) @map("decided_at")
   organization Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  proposal     Proposal         @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  proposal     Proposal         @relation(fields: [orgId, proposalId], references: [orgId, id], onDelete: Cascade)
 
   @@index([orgId])
   @@map("approvals")
@@ -288,6 +294,8 @@ model WorkflowRun {
   organization Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
   steps        WorkflowStep[]
 
+  // Lets child rows reference (org_id, id), so a child can never point at another org.
+  @@unique([orgId, id])
   @@index([orgId])
   @@map("workflow_runs")
 }
@@ -303,7 +311,7 @@ model WorkflowStep {
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
   organization   Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  run            WorkflowRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  run            WorkflowRun    @relation(fields: [orgId, runId], references: [orgId, id], onDelete: Cascade)
 
   @@unique([runId, idempotencyKey])
   @@index([orgId])

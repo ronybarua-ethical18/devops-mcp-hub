@@ -136,10 +136,47 @@ describe("scopeArgs: relations and unknown operations", () => {
     }
   });
 
-  it("passes plain non-tenant queries through unchanged", () => {
-    const args = { where: { email: "a@b.c" }, select: { id: true } };
-    for (const model of ["User", "Organization", "McpClient"]) {
-      expect(scopeArgs(model, "findMany", args, ORG)).toBe(args);
+  it("rejects every operation on the global users and mcp_clients tables", () => {
+    for (const model of ["User", "McpClient"]) {
+      for (const operation of ["findMany", "findUnique", "count", "create", "update", "delete"]) {
+        expect(
+          () => scopeArgs(model, operation, { where: { id: "x" } }, ORG),
+          `${model}.${operation}`,
+        ).toThrow(TenantViolationError);
+      }
+    }
+  });
+
+  it("forces organization reads and updates onto the scope's own org", () => {
+    expect(scopeArgs("Organization", "findMany", undefined, ORG)).toEqual({ where: { id: ORG } });
+    expect(scopeArgs("Organization", "findUnique", { where: { id: ORG } }, ORG)).toEqual({
+      where: { id: ORG },
+    });
+    expect(scopeArgs("Organization", "findFirst", { where: { slug: "b" } }, ORG)).toEqual({
+      where: { slug: "b", id: ORG },
+    });
+    expect(
+      scopeArgs("Organization", "update", { where: { id: ORG }, data: { name: "n" } }, ORG),
+    ).toEqual({ where: { id: ORG }, data: { name: "n" } });
+  });
+
+  it("rejects another org's id, a changed id, and creating or deleting organizations", () => {
+    const bad: Array<[string, unknown]> = [
+      ["findUnique", { where: { id: OTHER } }],
+      ["findMany", { where: { OR: [{ id: OTHER }] } }],
+      ["findMany", { where: { id: { in: [ORG, OTHER] } } }],
+      ["update", { where: { id: ORG }, data: { id: OTHER } }],
+      ["updateMany", { data: { name: "x" }, where: { id: OTHER } }],
+      ["create", { data: { name: "x", slug: "x" } }],
+      ["createMany", { data: [{ name: "x", slug: "x" }] }],
+      ["upsert", { where: { id: ORG }, create: { name: "x", slug: "x" }, update: {} }],
+      ["delete", { where: { id: ORG } }],
+      ["deleteMany", {}],
+    ];
+    for (const [operation, args] of bad) {
+      expect(() => scopeArgs("Organization", operation, args, ORG), operation).toThrow(
+        TenantViolationError,
+      );
     }
   });
 

@@ -76,6 +76,30 @@ describe.skipIf(!url)("tenant isolation and credentials against Postgres", () =>
     expect(await prisma.credential.count({ where: { orgId: ids.orgB } })).toBe(0);
   });
 
+  it("rejects a row in org B that points at org A's project, at the database", async () => {
+    const b = createTenantClient(prisma, ids.orgB);
+    await expect(
+      b.toolPolicy.create({
+        data: {
+          orgId: ids.orgB,
+          projectId: ids.projectA,
+          toolName: "t",
+          effect: "allow",
+          riskTier: "read",
+        },
+      }),
+    ).rejects.toThrow();
+    expect(await prisma.toolPolicy.count({ where: { orgId: ids.orgB } })).toBe(0);
+  });
+
+  it("forces organization queries onto the scope's own row", async () => {
+    const b = createTenantClient(prisma, ids.orgB);
+    expect((await b.organization.findMany()).map((o) => o.id)).toEqual([ids.orgB]);
+    await expect(b.organization.delete({ where: { id: ids.orgA } })).rejects.toBeInstanceOf(
+      TenantViolationError,
+    );
+  });
+
   it("rejects UPDATE, DELETE and TRUNCATE of audit_events at the database", async () => {
     await forOrg(prisma, ids.orgA, deps).audit.append({
       actorId: "u1",

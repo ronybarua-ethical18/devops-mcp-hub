@@ -81,6 +81,17 @@ const WHERE_OPERATIONS = new Set([
   "deleteMany",
 ]);
 const CREATE_OPERATIONS = new Set(["create", "createMany", "createManyAndReturn"]);
+const ORGANIZATION_OPERATIONS = new Set([
+  "findFirst",
+  "findFirstOrThrow",
+  "findMany",
+  "findUnique",
+  "findUniqueOrThrow",
+  "count",
+  "aggregate",
+  "update",
+  "updateMany",
+]);
 
 type Obj = Record<string, unknown>;
 
@@ -92,26 +103,32 @@ function violation(message: string): never {
   throw new TenantViolationError(message);
 }
 
-/** Reject an `orgId` that is not the scope's, and relation traversal, anywhere in a filter. */
-function checkWhere(where: unknown, orgId: string): void {
+/**
+ * The column that holds the org: `orgId` on tenant tables, `id` on organizations.
+ * Users and mcp_clients have none and are rejected (see scopeArgs).
+ */
+type ScopeKey = "orgId" | "id";
+
+/** Reject a scope key that is not the scope's org, and relation traversal, anywhere in a filter. */
+function checkWhere(where: unknown, orgId: string, scopeKey: ScopeKey): void {
   if (where === undefined) return;
   if (!isObj(where)) violation("where must be an object");
   for (const [key, value] of Object.entries(where)) {
-    if (key === "orgId") {
-      if (value !== orgId) violation("orgId in where does not match the tenant scope");
+    if (key === scopeKey) {
+      if (value !== orgId) violation(`${scopeKey} in where does not match the tenant scope`);
     } else if (key === "AND" || key === "OR" || key === "NOT") {
-      for (const part of Array.isArray(value) ? value : [value]) checkWhere(part, orgId);
+      for (const part of Array.isArray(value) ? value : [value]) checkWhere(part, orgId, scopeKey);
     } else if (isRelationField(key)) {
       violation(`relation filter "${key}" is not allowed on the tenant client`);
     }
   }
 }
 
-function checkData(data: unknown, orgId: string): void {
+function checkData(data: unknown, orgId: string, scopeKey: ScopeKey = "orgId"): void {
   if (!isObj(data)) violation("data must be an object");
   for (const [key, value] of Object.entries(data)) {
-    if (key === "orgId" && value !== orgId) {
-      violation("orgId in data does not match the tenant scope");
+    if (key === scopeKey && value !== orgId) {
+      violation(`${scopeKey} in data does not match the tenant scope`);
     }
     if (isRelationField(key)) {
       violation(`nested relation write "${key}" is not allowed on the tenant client`);
@@ -150,26 +167,32 @@ function withOrg(data: unknown, orgId: string): Obj {
 
 /**
  * Return args for a Prisma operation with the tenant filter injected. Never mutates `args`.
- * Fails closed: unknown operations and relation traversal on tenant models throw.
+ * Fails closed: unknown operations, relation traversal and the global users and mcp_clients
+ * tables throw; organizations are limited to the scope's own row.
  */
 export function scopeArgs(model: string, operation: string, args: unknown, orgId: string): unknown {
   if (args !== undefined && !isObj(args)) violation("args must be an object");
   const input: Obj = args ?? {};
   checkShape(input);
 
-  if (!TENANT_MODELS.has(model)) {
-    // Non-tenant models have no org filter, but their relations lead into tenant tables.
-    checkWhere(input["where"], orgId);
-    for (const key of ["data", "create", "update"]) {
-      const value = input[key];
-      if (value === undefined) continue;
-      for (const row of Array.isArray(value) ? value : [value]) checkData(row, orgId);
+  if (model === "Organization") {
+    // An org may read and rename itself only: never another org, never create or delete one.
+    if (!ORGANIZATION_OPERATIONS.has(operation)) {
+      violation(`operation "${operation}" on organizations is not allowed on the tenant client`);
     }
-    return args;
+    checkWhere(input["where"], orgId, "id");
+    if (input["data"] !== undefined) checkData(input["data"], orgId, "id");
+    const where = isObj(input["where"]) ? input["where"] : {};
+    return { ...input, where: { ...where, id: orgId } };
+  }
+
+  if (!TENANT_MODELS.has(model)) {
+    // users and mcp_clients are global and span every org: they need their own repository.
+    return violation(`model "${model}" is not allowed on the tenant client`);
   }
 
   if (WHERE_OPERATIONS.has(operation)) {
-    checkWhere(input["where"], orgId);
+    checkWhere(input["where"], orgId, "orgId");
     if (input["data"] !== undefined) checkData(input["data"], orgId);
     const where = isObj(input["where"]) ? input["where"] : {};
     return { ...input, where: { ...where, orgId } };
@@ -184,7 +207,7 @@ export function scopeArgs(model: string, operation: string, args: unknown, orgId
   }
 
   if (operation === "upsert") {
-    checkWhere(input["where"], orgId);
+    checkWhere(input["where"], orgId, "orgId");
     checkData(input["update"], orgId);
     const where = isObj(input["where"]) ? input["where"] : {};
     return {
