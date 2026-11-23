@@ -1,3 +1,6 @@
+// Tests for logger.ts: every log line carries the right trace_id, even across await and parallel requests.
+// Also checks that token, password and authorization fields are hidden.
+
 import { Writable } from "node:stream";
 import { describe, expect, it } from "vitest";
 import { createLogger, currentTraceId, runWithTrace } from "../src/logger.js";

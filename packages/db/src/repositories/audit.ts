@@ -1,3 +1,6 @@
+// Writes entries to the audit log, the permanent record of who did what.
+// It can only add entries; there is no way to change or delete them, on purpose.
+
 import type { Prisma } from "../generated/client.js";
 import type { TenantClient } from "../tenant/client.js";
 

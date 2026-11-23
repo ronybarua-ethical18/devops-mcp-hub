@@ -1,3 +1,6 @@
+<!-- The step-by-step plan that Phase 2 (this foundation work) was built from.
+     Lists every task, its tests and the rules it had to follow, so the work can be checked against it. -->
+
 # Phase 2: Foundation Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

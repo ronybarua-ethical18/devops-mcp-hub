@@ -1,3 +1,6 @@
+// Tests for the credentials and audit repositories, using a fake in-memory database.
+// Proves tokens are stored only encrypted and that one org can't open another org's token.
+
 import { randomBytes } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { createAuditRepo } from "../src/repositories/audit.js";

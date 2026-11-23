@@ -1,3 +1,6 @@
+<!-- Decision record: background jobs will run on Postgres (pg-boss) instead of Redis (BullMQ).
+     One less service to run; nothing is installed yet, Phase 8 starts from this decision. -->
+
 # ADR 0003: Use pg-boss on Postgres for background jobs, not BullMQ
 
 - **Status:** Accepted

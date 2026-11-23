@@ -1,3 +1,6 @@
+<!-- Decision record: how provider tokens are encrypted before they are saved (envelope encryption, AES-256-GCM).
+     Explains why each token gets its own key, and what happens if the master key leaks or is rotated. -->
+
 # ADR 0002: Envelope-encrypt provider credentials with AES-256-GCM
 
 - **Status:** Accepted

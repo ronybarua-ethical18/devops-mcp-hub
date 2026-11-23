@@ -1,3 +1,6 @@
+// Reads and checks the server's environment variables (database URL, master key, port) at startup.
+// If anything is missing or wrong the server refuses to start, and it never prints the secret values.
+
 import { parseMasterKey, type MasterKey } from "@hub/db";
 import { z } from "zod/v4";
 

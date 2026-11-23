@@ -1,3 +1,6 @@
+// The database design: all 15 tables, their columns, and how they link to each other.
+// Prisma turns this into SQL migrations and into the typed client the code uses to query the database.
+
 generator client {
   provider = "prisma-client"
   output   = "../src/generated"

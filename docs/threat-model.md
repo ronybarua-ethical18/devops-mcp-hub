@@ -1,3 +1,6 @@
+<!-- The list of ways the hub could be attacked, and what stops each one.
+     Each row names the phase that builds the protection and the test that proves it. -->
+
 # Threat model
 
 This hub holds all three parts of the "lethal trifecta":

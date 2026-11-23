@@ -1,3 +1,6 @@
+// Encrypts and decrypts provider tokens with two layers of keys (envelope encryption).
+// Each token gets its own key, which is itself locked with the master key from HUB_MASTER_KEY.
+
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
 const ALGORITHM = "aes-256-gcm";

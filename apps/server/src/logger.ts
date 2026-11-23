@@ -1,3 +1,6 @@
+// Creates the server's logger (Pino) and attaches the current request's trace_id to every log line.
+// Also hides fields like tokens and passwords, so secrets don't end up in the logs.
+
 import { AsyncLocalStorage } from "node:async_hooks";
 import { pino, type DestinationStream, type Logger } from "pino";
 

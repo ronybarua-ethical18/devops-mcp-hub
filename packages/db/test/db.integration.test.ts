@@ -1,3 +1,6 @@
+// Tests against a real Postgres database (Neon): org isolation, encrypted tokens, and the locked audit table.
+// They only run when TEST_DATABASE_URL is set; otherwise they are skipped.
+
 import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPrisma, forOrg, parseMasterKey, TenantViolationError } from "../src/index.js";

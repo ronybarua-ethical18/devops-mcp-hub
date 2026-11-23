@@ -1,3 +1,6 @@
+// The rules that keep each org's data separate: adds the org filter to every query and rejects unsafe ones.
+// This is the core of tenant isolation; if a rule here is wrong, one org could see another's data.
+
 /** Prisma model names of the tables that carry `orgId`. */
 export const TENANT_MODELS: ReadonlySet<string> = new Set([
   "Membership",

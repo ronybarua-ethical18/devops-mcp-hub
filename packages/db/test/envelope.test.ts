@@ -1,3 +1,6 @@
+// Tests for envelope.ts: tokens decrypt back correctly, and any tampering is caught.
+// Also proves error messages never contain the token or the key.
+
 import { randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {

@@ -1,3 +1,6 @@
+// forOrg(): the single entry point app code uses to reach one org's data.
+// It hands out repositories that are already locked to that org.
+
 import type { MasterKey } from "../crypto/envelope.js";
 import type { PrismaClient } from "../generated/client.js";
 import { createTenantClient } from "../tenant/client.js";

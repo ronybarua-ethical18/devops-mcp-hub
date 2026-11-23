@@ -1,4 +1,5 @@
-// Prisma schema, migrations and tenant-scoped repositories.
+// The public face of the db package: everything other packages may import from @hub/db.
+// Only safe entry points are exported (forOrg, createPrisma, key parsing); internals stay private.
 export { createPrisma } from "./client.js";
 export { parseMasterKey, type MasterKey } from "./crypto/envelope.js";
 export { forOrg, type OrgRepositories, type RepoDeps } from "./repositories/index.js";

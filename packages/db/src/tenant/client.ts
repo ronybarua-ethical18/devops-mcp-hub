@@ -1,3 +1,6 @@
+// Wraps the database client so every query is forced into one org.
+// Raw SQL is refused here because it would skip the org check.
+
 import { Prisma, type PrismaClient } from "../generated/client.js";
 import { scopeArgs, TenantViolationError } from "./scope.js";
 

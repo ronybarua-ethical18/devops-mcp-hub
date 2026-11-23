@@ -1,3 +1,6 @@
+// Saves provider tokens encrypted, and decrypts them again when they are needed.
+// Every lookup is limited to one org, so one org can never read another org's tokens.
+
 import { randomUUID } from "node:crypto";
 import { openSecret, sealSecret, type MasterKey } from "../crypto/envelope.js";
 import type { TenantClient } from "../tenant/client.js";

@@ -1,3 +1,6 @@
+// Tests for scope.ts: the org filter is always added and unsafe queries are refused.
+// Covers another org's id, nested relations, unknown operations and the global tables.
+
 import { describe, expect, it } from "vitest";
 import { scopeArgs, TENANT_MODELS, TenantViolationError } from "../src/tenant/scope.js";
 

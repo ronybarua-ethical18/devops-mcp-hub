@@ -1,3 +1,6 @@
+# Files Prettier (the code formatter) must skip.
+# Lockfiles, build output and generated code are written by tools, so they are never reformatted.
+
 pnpm-lock.yaml
 .next/
 dist/

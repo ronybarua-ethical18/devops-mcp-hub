@@ -1,3 +1,6 @@
+// Tests the tenant wrapper on a real Prisma client, without connecting to a database.
+// Proves raw SQL and other-org queries are refused before anything is sent.
+
 import { PrismaPg } from "@prisma/adapter-pg";
 import { describe, expect, it, vi } from "vitest";
 import { PrismaClient } from "../src/generated/client.js";

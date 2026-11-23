@@ -1,3 +1,6 @@
+// The server's entry point: checks the environment, sets up logging and starts the Fastify web server.
+// Every request gets a trace id here, so all its log lines can be followed end to end.
+
 import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 import { HUB_NAME } from "@hub/core";

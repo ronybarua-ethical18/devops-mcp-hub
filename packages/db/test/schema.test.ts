@@ -1,3 +1,6 @@
+// Reads schema.prisma and the migrations and checks the database design follows the project rules.
+// For example: every org table has org_id, cross-org links are blocked, and the audit table can't be edited.
+
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

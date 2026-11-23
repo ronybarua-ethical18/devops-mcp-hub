@@ -1,3 +1,6 @@
+// Tests for env.ts: valid settings load, bad or missing ones stop the server.
+// Also proves the error message names the broken variables but never shows their values.
+
 import { randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { EnvError, loadEnv } from "../src/env.js";
