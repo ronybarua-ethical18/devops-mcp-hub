@@ -1,3 +1,6 @@
+# Files and folders git should never track: dependencies, build output, secrets, local settings.
+# Keeps generated code (like the Prisma client) and private files such as .env out of the repo.
+
 # dependencies
 node_modules/
 .pnp
@@ -43,3 +46,9 @@ Thumbs.db
 
 # local Claude Code settings
 .claude/settings.local.json
+
+# generated Prisma client
+packages/db/src/generated/
+
+# superpowers executor scratch
+.superpowers/

@@ -6,15 +6,20 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@hub/core": "workspace:*",
-    "fastify": "^5"
+    "@hub/db": "workspace:*",
+    "fastify": "^5",
+    "pino": "10.4.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^22",
     "tsx": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "5.1.0"
   }
 }

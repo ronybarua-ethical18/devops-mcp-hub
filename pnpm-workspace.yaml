@@ -1,9 +1,14 @@
+# Tells pnpm which folders are packages in this monorepo, and which installs may run scripts.
+# Prisma's install scripts are turned off on purpose, so a dependency can't run code during install.
+
 packages:
   - apps/*
   - packages/*
   - spikes/*
 
 allowBuilds:
+  "@prisma/engines": false
   esbuild: true
+  prisma: false
   sharp: false
   unrs-resolver: false
