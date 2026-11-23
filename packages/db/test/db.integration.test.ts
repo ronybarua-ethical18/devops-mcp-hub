@@ -88,7 +88,8 @@ describe.skipIf(!url)("tenant isolation and credentials against Postgres", () =>
           riskTier: "read",
         },
       }),
-    ).rejects.toThrow();
+      // P2003 is Prisma's foreign-key violation: the database refused it, not some other error.
+    ).rejects.toMatchObject({ code: "P2003" });
     expect(await prisma.toolPolicy.count({ where: { orgId: ids.orgB } })).toBe(0);
   });
 
