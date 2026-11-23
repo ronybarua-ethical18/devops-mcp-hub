@@ -106,6 +106,31 @@ describe("logger", () => {
     expect(lines.join("\n")).not.toContain(ghp);
   });
 
+  it("logs a circular object without throwing", () => {
+    const { logger, lines } = capture();
+    const ghp = `ghp_${"e".repeat(36)}`;
+    const loop: Record<string, unknown> = { note: ghp };
+    loop["self"] = loop;
+    const err = Object.assign(new Error("cyclic"), { ctx: loop });
+    expect(() => logger.info({ loop }, "cycle")).not.toThrow();
+    expect(() => logger.error({ err }, "cycle")).not.toThrow();
+    expect(lines.join("\n")).not.toContain(ghp);
+  });
+
+  it("keeps an Error's class and cause, with the cause scrubbed", () => {
+    class ProviderError extends Error {
+      override name = "ProviderError";
+    }
+    const { logger, lines, records } = capture();
+    const ghp = `ghp_${"f".repeat(36)}`;
+    const err = new ProviderError("call failed", { cause: new TypeError(`root ${ghp}`) });
+    logger.error({ err }, "failed");
+    const logged = records()[0]?.["err"] as Record<string, unknown>;
+    expect(logged["type"]).toBe("ProviderError");
+    expect(lines.join("\n")).toContain("root [REDACTED]");
+    expect(lines.join("\n")).not.toContain(ghp);
+  });
+
   it("leaves ordinary values alone", () => {
     const { logger, records } = capture();
     const id = "3f2b6c1e-8a4d-4c2b-9e7f-1a2b3c4d5e6f";
