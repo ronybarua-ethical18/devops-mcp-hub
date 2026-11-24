@@ -1,4 +1,4 @@
-// The list of secret fields to hide in logs, and a scrubber that blanks out token-shaped values.
+// The list of secret fields to hide in logs, and scrubbers that blank out token-shaped values.
 // Used by logger.ts so a token, cookie or database password never ends up in a log line.
 
 /** Field paths Pino blanks out, whatever their value. `*` matches one level of nesting. */
@@ -49,18 +49,28 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return proto === Object.prototype || proto === null;
 }
 
+/** Nesting deeper than this is cut off, so a huge response object can't slow logging down. */
+const MAX_DEPTH = 10;
+
 /**
  * Deep-scrub strings in plain objects, arrays and Errors. Returns a copy; never mutates.
  * Cycles are copied as cycles (Pino prints them as "[Circular]"); Errors keep their class and cause.
+ * Class instances (Fastify's `req`, SDK responses) are returned as they are, because Pino's
+ * serializers read their prototype getters; logger.ts scrubs the serialized line to cover them.
  */
-export function scrubSecrets(value: unknown, seen = new WeakMap<object, unknown>()): unknown {
+export function scrubSecrets(value: unknown): unknown {
+  return scrubValue(value, new WeakMap<object, unknown>(), 0);
+}
+
+function scrubValue(value: unknown, seen: WeakMap<object, unknown>, depth: number): unknown {
   if (typeof value === "string") return scrubString(value);
   if (typeof value !== "object" || value === null) return value;
   if (seen.has(value)) return seen.get(value);
+  if (depth >= MAX_DEPTH) return "[Truncated]";
   if (Array.isArray(value)) {
     const copy: unknown[] = [];
     seen.set(value, copy);
-    for (const item of value) copy.push(scrubSecrets(item, seen));
+    for (const item of value) copy.push(scrubValue(item, seen, depth + 1));
     return copy;
   }
   if (value instanceof Error) {
@@ -69,14 +79,18 @@ export function scrubSecrets(value: unknown, seen = new WeakMap<object, unknown>
     seen.set(value, copy);
     copy["message"] = scrubString(value.message);
     if (value.stack !== undefined) copy["stack"] = scrubString(value.stack);
-    if (Object.hasOwn(value, "cause")) copy["cause"] = scrubSecrets(value.cause, seen);
-    for (const [key, inner] of Object.entries(value)) copy[key] = scrubSecrets(inner, seen);
+    if (Object.hasOwn(value, "cause")) copy["cause"] = scrubValue(value.cause, seen, depth + 1);
+    for (const [key, inner] of Object.entries(value)) {
+      copy[key] = scrubValue(inner, seen, depth + 1);
+    }
     return copy;
   }
   if (isPlainObject(value)) {
     const copy: Record<string, unknown> = {};
     seen.set(value, copy);
-    for (const [key, inner] of Object.entries(value)) copy[key] = scrubSecrets(inner, seen);
+    for (const [key, inner] of Object.entries(value)) {
+      copy[key] = scrubValue(inner, seen, depth + 1);
+    }
     return copy;
   }
   return value;

@@ -2,6 +2,7 @@
 // Also checks that secret fields, cookies and token-shaped values (GitHub, Sentry, Bearer, DB URLs) are hidden.
 
 import { Writable } from "node:stream";
+import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
 import { createLogger, currentTraceId, runWithTrace } from "../src/logger.js";
 
@@ -128,6 +129,48 @@ describe("logger", () => {
     const logged = records()[0]?.["err"] as Record<string, unknown>;
     expect(logged["type"]).toBe("ProviderError");
     expect(lines.join("\n")).toContain("root [REDACTED]");
+    expect(lines.join("\n")).not.toContain(ghp);
+  });
+
+  it("scrubs a token inside a class instance, including prototype getters", () => {
+    class ProviderResponse {
+      constructor(readonly url: string) {}
+      get href(): string {
+        return this.url;
+      }
+    }
+    const { logger, lines } = capture();
+    const ghp = `ghp_${"g".repeat(36)}`;
+    logger.info({ res: new ProviderResponse(`https://api.example.com/?access=${ghp}`) }, "got");
+    expect(lines.join("\n")).not.toContain(ghp);
+    expect(lines.join("\n")).toContain("[REDACTED]");
+  });
+
+  it("scrubs a token in a child-logger binding and in an object key", () => {
+    const { logger, lines } = capture();
+    const ghp = `ghp_${"h".repeat(36)}`;
+    logger.child({ upstream: `https://x.test/?t=${ghp}` }).info({ [ghp]: 1 }, "bound");
+    expect(lines.join("\n")).not.toContain(ghp);
+  });
+
+  it("scrubs a token in Fastify's req.url", async () => {
+    const { logger, lines } = capture();
+    const ghp = `ghp_${"i".repeat(36)}`;
+    const app = Fastify({ loggerInstance: logger });
+    app.get("/ping", async () => ({ ok: true }));
+    await app.inject({ method: "GET", url: `/ping?token_in_url=${ghp}` });
+    await app.close();
+    const out = lines.join("\n");
+    expect(out).toContain("/ping");
+    expect(out).not.toContain(ghp);
+  });
+
+  it("cuts off very deep objects instead of walking them forever", () => {
+    const { logger, lines } = capture();
+    const ghp = `ghp_${"j".repeat(36)}`;
+    let deep: Record<string, unknown> = { leaf: ghp };
+    for (let i = 0; i < 50; i++) deep = { next: deep };
+    expect(() => logger.info({ deep }, "deep")).not.toThrow();
     expect(lines.join("\n")).not.toContain(ghp);
   });
 

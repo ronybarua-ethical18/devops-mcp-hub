@@ -1,9 +1,9 @@
 // Creates the server's logger (Pino) and attaches the current request's trace_id to every log line.
-// Also hides secret fields and token-shaped values (see redact.ts), so secrets don't end up in the logs.
+// Also hides secret fields and token-shaped values (see redact.ts), including in the final JSON line.
 
 import { AsyncLocalStorage } from "node:async_hooks";
 import { pino, type DestinationStream, type Logger } from "pino";
-import { REDACT_PATHS, scrubSecrets } from "./redact.js";
+import { REDACT_PATHS, scrubSecrets, scrubString } from "./redact.js";
 
 const traceStorage = new AsyncLocalStorage<string>();
 
@@ -21,6 +21,16 @@ function traceIdFor(self: Logger): string {
   if (active !== undefined) return active;
   const { reqId } = self.bindings();
   return typeof reqId === "string" ? reqId : "none";
+}
+
+/**
+ * Last line of defence: scrub the finished JSON line just before it is written. This covers what
+ * the object walk can't reach: class instances (Fastify `req.url`, provider responses), object
+ * keys and child-logger bindings. Token formats contain no JSON-escaped characters, so matching
+ * on the serialized text is safe and costs one pass over the line, however deep the object was.
+ */
+function scrubbedDestination(inner: DestinationStream): DestinationStream {
+  return { write: (line: string) => inner.write(scrubString(line)) };
 }
 
 /** Pino logger with `trace_id` on every line. `destination` exists for tests. */
@@ -41,6 +51,6 @@ export function createLogger(opts: { level: string }, destination?: DestinationS
         },
       },
     },
-    destination,
+    scrubbedDestination(destination ?? pino.destination(1)),
   );
 }
