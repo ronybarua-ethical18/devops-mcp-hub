@@ -4,7 +4,7 @@
 import { Writable } from "node:stream";
 import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
-import { createLogger, currentTraceId, runWithTrace } from "../src/logger.js";
+import { createLogger, currentTraceId, runWithTrace, scrubbedDestination } from "../src/logger.js";
 
 function capture(level = "info") {
   const lines: string[] = [];
@@ -165,13 +165,53 @@ describe("logger", () => {
     expect(out).not.toContain(ghp);
   });
 
+  it("scrubs a token in an object key that needs JSON escaping", () => {
+    const { logger, lines, records } = capture();
+    const ghp = `ghp_${"n".repeat(36)}`;
+    logger.info({ [`say "hi" ${ghp}\n`]: 1 }, "escaped key");
+    expect(lines.join("\n")).not.toContain(ghp);
+    // The line must still be valid JSON after the scrub.
+    expect(records()[0]).toMatchObject({ msg: "escaped key" });
+  });
+
   it("cuts off very deep objects instead of walking them forever", () => {
     const { logger, lines } = capture();
     const ghp = `ghp_${"j".repeat(36)}`;
     let deep: Record<string, unknown> = { leaf: ghp };
     for (let i = 0; i < 50; i++) deep = { next: deep };
     expect(() => logger.info({ deep }, "deep")).not.toThrow();
-    expect(lines.join("\n")).not.toContain(ghp);
+    const out = lines.join("\n");
+    expect(out).toContain("[Truncated]");
+    expect(out).not.toContain(ghp);
+  });
+
+  it("keeps walking and scrubbing just above the depth cap", () => {
+    const { logger, lines } = capture();
+    const ghp = `ghp_${"k".repeat(36)}`;
+    // logMethod wraps the object at depth 0, so 8 wrappers put the leaf string at depth 9.
+    let nested: Record<string, unknown> = { leaf: ghp };
+    for (let i = 0; i < 8; i++) nested = { next: nested };
+    logger.info({ nested }, "shallow");
+    const out = lines.join("\n");
+    expect(out).not.toContain("[Truncated]");
+    expect(out).not.toContain(ghp);
+    expect(out).toContain("[REDACTED]");
+  });
+
+  it("forwards flushSync and end to the underlying destination", () => {
+    const calls: string[] = [];
+    const written: string[] = [];
+    const inner = {
+      write: (line: string) => written.push(line) > 0,
+      flushSync: () => calls.push("flushSync"),
+      end: () => calls.push("end"),
+    };
+    const wrapped = scrubbedDestination(inner) as typeof inner;
+    wrapped.write(`{"t":"ghp_${"m".repeat(36)}"}`);
+    wrapped.flushSync();
+    wrapped.end();
+    expect(calls).toEqual(["flushSync", "end"]);
+    expect(written.join("")).not.toContain("ghp_");
   });
 
   it("leaves ordinary values alone", () => {

@@ -29,8 +29,15 @@ function traceIdFor(self: Logger): string {
  * keys and child-logger bindings. Token formats contain no JSON-escaped characters, so matching
  * on the serialized text is safe and costs one pass over the line, however deep the object was.
  */
-function scrubbedDestination(inner: DestinationStream): DestinationStream {
-  return { write: (line: string) => inner.write(scrubString(line)) };
+export function scrubbedDestination(inner: DestinationStream): DestinationStream {
+  // Pino's default destination (SonicBoom) also has flushSync/end; forward them so the wrapper
+  // doesn't hide them and the stream can still be flushed and closed on shutdown.
+  const closable = inner as DestinationStream & { flushSync?: () => void; end?: () => void };
+  return {
+    write: (line: string) => inner.write(scrubString(line)),
+    ...(closable.flushSync !== undefined && { flushSync: () => closable.flushSync?.() }),
+    ...(closable.end !== undefined && { end: () => closable.end?.() }),
+  } as DestinationStream;
 }
 
 /** Pino logger with `trace_id` on every line. `destination` exists for tests. */

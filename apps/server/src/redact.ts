@@ -49,7 +49,11 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return proto === Object.prototype || proto === null;
 }
 
-/** Nesting deeper than this is cut off, so a huge response object can't slow logging down. */
+/**
+ * Nesting deeper than this is cut off, so the object walk stays bounded. It only limits plain
+ * objects, arrays and Errors: a huge class instance is still serialized by Pino in full, and
+ * logger.ts scrubs that line (cost grows with line size, not depth).
+ */
 const MAX_DEPTH = 10;
 
 /**
