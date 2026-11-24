@@ -83,7 +83,9 @@ export function createCredentialsRepo(
           master,
         );
       } catch (error) {
-        await record("error");
+        // If the audit write fails too, still surface the decryption error: it is the real cause.
+        // Nothing is returned either way, so this stays fail-closed.
+        await record("error").catch(() => undefined);
         throw error;
       }
       // Written before the token leaves this function: if the audit write fails, nothing is returned.

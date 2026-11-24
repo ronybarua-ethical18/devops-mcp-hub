@@ -178,6 +178,26 @@ describe("credentials repository", () => {
     });
   });
 
+  it("keeps the decryption error when the error audit write also fails", async () => {
+    const a = fakeTenantDb("org-a");
+    const { id } = await createCredentialsRepo(
+      a.db,
+      "org-a",
+      master,
+      createAuditRepo(a.db, "org-a"),
+    ).store({ integrationId: "i1", plaintext: "tok" });
+    const forged = fakeTenantDb("org-b");
+    forged.rows.push(...a.rows.map((r) => ({ ...r, orgId: "org-b" })));
+    forged.auditCreate.mockRejectedValueOnce(new Error("db down"));
+    const repo = createCredentialsRepo(
+      forged.db,
+      "org-b",
+      master,
+      createAuditRepo(forged.db, "org-b"),
+    );
+    await expect(repo.reveal(id, ctx)).rejects.toThrow("decryption failed");
+  });
+
   it("returns no token when the audit write fails", async () => {
     const { db, auditCreate } = fakeTenantDb("org-a");
     const repo = createCredentialsRepo(db, "org-a", master, createAuditRepo(db, "org-a"));
