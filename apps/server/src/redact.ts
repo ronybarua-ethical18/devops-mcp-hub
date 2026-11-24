@@ -27,11 +27,17 @@ export const REDACT_PATHS: readonly string[] = [
 
 const CENSOR = "[REDACTED]";
 
-// Token formats with a fixed prefix. Vercel tokens have none, so only field names cover them.
+// Token formats with a fixed prefix or marker. Vercel tokens have none, so only field names cover them.
 const VALUE_PATTERNS: ReadonlyArray<[RegExp, string]> = [
   [/\bgh[pousr]_[A-Za-z0-9]{20,}/g, CENSOR],
   [/\bgithub_pat_[A-Za-z0-9_]{20,}/g, CENSOR],
   [/\bsntry[su]_[A-Za-z0-9+/=_-]{20,}/g, CENSOR],
+  // A whole PEM private key. In a serialized log line the newlines are the two characters \n,
+  // which [\s\S] also matches. A header with no END marker (cut-off key) loses its base64 body too.
+  [
+    /-----BEGIN [A-Z ]*PRIVATE KEY-----(?:[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----|[A-Za-z0-9+/=\s\\]*)/g,
+    CENSOR,
+  ],
   [/\bBearer\s+[A-Za-z0-9._~+/=-]{16,}/g, `Bearer ${CENSOR}`],
   [/(postgres(?:ql)?:\/\/[^:\s/@]+:)[^@\s]+@/g, `$1${CENSOR}@`],
 ];

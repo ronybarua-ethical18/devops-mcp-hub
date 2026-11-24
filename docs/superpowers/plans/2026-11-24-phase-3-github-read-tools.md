@@ -1,5 +1,6 @@
 <!-- Implementation plan for roadmap issue #3 (Phase 3: GitHub read tools over Streamable HTTP).
      Written before coding, as CLAUDE.md rule 17 requires. -->
+
 # Phase 3: GitHub read tools over Streamable HTTP
 
 ## Context
@@ -67,17 +68,17 @@ tests/protocol/       tools/list snapshot, header mismatch, isError vs JSON-RPC 
 
 ## Tasks (TDD: failing test, run, implement, run, suggested commit)
 
-1. **Dependencies + env.** Add pinned deps; extend `env.ts` schema and tests; PEM redaction test. *Commit:* `chore(server): add MCP SDK deps and GitHub App env`.
-2. **GitHub adapter.** `app-auth.ts` (JWT, installation token, cache, expiry margin) and `client.ts` (list repos for installation, list PRs with cursor/max 50, get commit summary). msw fixtures for success, 404, 403, 429 with `Retry-After`, timeout. *Commit:* `feat(integrations): GitHub App adapter with msw fixtures`.
-3. **db read repositories.** Integration-by-provider and project-connection lookups on `forOrg`; extend tenant tests (foreign org returns null). *Commit:* `feat(db): tenant-scoped integration and connection reads`.
-4. **Core service.** `github/service.ts` enforces repo allowlist from `ProjectConnection`, cursor and limit rules, commit file cap; returns typed results with `untrusted_content`. *Commit:* `feat(core): GitHub read service`.
-5. **MCP registry + error mapper.** Deterministic `tools/list` order, annotations (`readOnlyHint`), `outputSchema`, `structuredContent` plus two-line text summary, `cacheScope: "private"` and `ttlMs` on list results; error mapper with fix-it hints. *Commit:* `feat(mcp): tool registry and error mapper`.
-6. **Four tools + resource template.** `hub_whoami`, `github_list_repos`, `github_list_pull_requests`, `github_get_commit`, `github://{owner}/{repo}/commits/{sha}`. Strict zod input (`zod/v4`). *Commit:* `feat(mcp): GitHub read tools and commit resource`.
-7. **HTTP endpoint.** `mcp/http.ts`: header-check middleware before body parse (`HeaderMismatchError`), `createMcpHandler(..., { legacy: "reject" })`, Host/Origin validation, Fastify bridge keeping the `trace_id` hook; dev `AuthContext`. *Commit:* `feat(server): stateless /mcp over Streamable HTTP`.
-8. **Visibility + `toolsListChanged`.** Show only tools for connected providers; emit change via `subscriptions/listen` when a provider connects. Verify against the pinned SDK first; if 2.4.0 lacks it, document the gap in the ADR and test the visibility filtering alone (flagged to the reviewer). *Commit:* `feat(mcp): per-tenant tool visibility`.
-9. **`--stdio` mode.** Same registry over stdio for local use. *Commit:* `feat(server): stdio transport`.
-10. **GitHub App install flow.** Minimal: installation callback records `externalAccountId` and chosen repos as `ProjectConnection` rows (via `forOrg`), without OAuth. If this balloons past ~400 lines of real code, split it into a follow-up issue and seed via a script for Gate B testing. *Commit:* `feat(server): GitHub App install callback`.
-11. **Snapshot, ADRs, threat model.** `tools/list` snapshot test; ADR 0004 (stateless serving) and 0005 (snake_case + provider prefix); threat-model tool rows and rows 11/12 updated. *Commit:* `docs: Phase 3 ADRs, threat model, tools/list snapshot`.
+1. **Dependencies + env.** Add pinned deps; extend `env.ts` schema and tests; PEM redaction test. _Commit:_ `chore(server): add MCP SDK deps and GitHub App env`.
+2. **GitHub adapter.** `app-auth.ts` (JWT, installation token, cache, expiry margin) and `client.ts` (list repos for installation, list PRs with cursor/max 50, get commit summary). msw fixtures for success, 404, 403, 429 with `Retry-After`, timeout. _Commit:_ `feat(integrations): GitHub App adapter with msw fixtures`.
+3. **db read repositories.** Integration-by-provider and project-connection lookups on `forOrg`; extend tenant tests (foreign org returns null). _Commit:_ `feat(db): tenant-scoped integration and connection reads`.
+4. **Core service.** `github/service.ts` enforces repo allowlist from `ProjectConnection`, cursor and limit rules, commit file cap; returns typed results with `untrusted_content`. _Commit:_ `feat(core): GitHub read service`.
+5. **MCP registry + error mapper.** Deterministic `tools/list` order, annotations (`readOnlyHint`), `outputSchema`, `structuredContent` plus two-line text summary, `cacheScope: "private"` and `ttlMs` on list results; error mapper with fix-it hints. _Commit:_ `feat(mcp): tool registry and error mapper`.
+6. **Four tools + resource template.** `hub_whoami`, `github_list_repos`, `github_list_pull_requests`, `github_get_commit`, `github://{owner}/{repo}/commits/{sha}`. Strict zod input (`zod/v4`). _Commit:_ `feat(mcp): GitHub read tools and commit resource`.
+7. **HTTP endpoint.** `mcp/http.ts`: header-check middleware before body parse (`HeaderMismatchError`), `createMcpHandler(..., { legacy: "reject" })`, Host/Origin validation, Fastify bridge keeping the `trace_id` hook; dev `AuthContext`. _Commit:_ `feat(server): stateless /mcp over Streamable HTTP`.
+8. **Visibility + `toolsListChanged`.** Show only tools for connected providers; emit change via `subscriptions/listen` when a provider connects. Verify against the pinned SDK first; if 2.4.0 lacks it, document the gap in the ADR and test the visibility filtering alone (flagged to the reviewer). _Commit:_ `feat(mcp): per-tenant tool visibility`.
+9. **`--stdio` mode.** Same registry over stdio for local use. _Commit:_ `feat(server): stdio transport`.
+10. **GitHub App install flow.** Minimal: installation callback records `externalAccountId` and chosen repos as `ProjectConnection` rows (via `forOrg`), without OAuth. If this balloons past ~400 lines of real code, split it into a follow-up issue and seed via a script for Gate B testing. _Commit:_ `feat(server): GitHub App install callback`.
+11. **Snapshot, ADRs, threat model.** `tools/list` snapshot test; ADR 0004 (stateless serving) and 0005 (snake_case + provider prefix); threat-model tool rows and rows 11/12 updated. _Commit:_ `docs: Phase 3 ADRs, threat model, tools/list snapshot`.
 12. **Done-when verification.** Run `pnpm typecheck && pnpm test && pnpm lint && pnpm format:check`; MCP Inspector (`--protocol-era modern`) lists and calls the tools over HTTP; `structuredContent` validates against `outputSchema`; a bad repo name returns `isError` with a hint.
 
 ## Verification

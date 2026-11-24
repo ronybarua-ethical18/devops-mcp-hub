@@ -10,9 +10,13 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@hono/node-server": "2.1.6",
     "@hub/core": "workspace:*",
     "@hub/db": "workspace:*",
+    "@modelcontextprotocol/hono": "2.0.2",
+    "@modelcontextprotocol/server": "2.4.0",
     "fastify": "^5",
+    "hono": "4.13.17",
     "pino": "10.4.0",
     "zod": "4.6.7"
   },
