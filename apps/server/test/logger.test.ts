@@ -1,5 +1,5 @@
 // Tests for logger.ts: every log line carries the right trace_id, even across await and parallel requests.
-// Also checks that token, password and authorization fields are hidden.
+// Also checks that secret fields, cookies and token-shaped values (GitHub, Sentry, Bearer, DB URLs) are hidden.
 
 import { Writable } from "node:stream";
 import { describe, expect, it } from "vitest";
@@ -73,6 +73,74 @@ describe("logger", () => {
       expect(output).not.toContain(secret);
     }
     expect(output).toContain("[REDACTED]");
+  });
+
+  it("redacts cookies, set-cookie, nested authorization and secret env names", () => {
+    const { logger, lines } = capture();
+    logger.info({
+      req: { headers: { authorization: "Bearer AAAAAAAAAAAAAAAAAAAA1", cookie: "sid=COOKIE1" } },
+      res: { headers: { "set-cookie": "sid=COOKIE2" } },
+      env: { DATABASE_URL: "postgres://u:DBPASS1@h/db", HUB_MASTER_KEY: "MASTERKEY1" },
+    });
+    const out = lines.join("\n");
+    for (const s of ["AAAAAAAAAAAAAAAAAAAA1", "COOKIE1", "COOKIE2", "DBPASS1", "MASTERKEY1"]) {
+      expect(out).not.toContain(s);
+    }
+  });
+
+  it("scrubs token formats from any string, including the message", () => {
+    const { logger, lines } = capture();
+    const ghp = `ghp_${"a".repeat(36)}`;
+    const pat = `github_pat_${"b".repeat(40)}`;
+    const sentry = `sntrys_${"c".repeat(40)}`;
+    logger.info({ note: `pasted ${pat}`, list: [sentry] }, `using ${ghp}`);
+    logger.warn("connect postgresql://user:PGSECRET@host/db failed");
+    const out = lines.join("\n");
+    for (const s of [ghp, pat, sentry, "PGSECRET"]) expect(out).not.toContain(s);
+  });
+
+  it("scrubs a token from an Error message and stack", () => {
+    const { logger, lines } = capture();
+    const ghp = `ghp_${"d".repeat(36)}`;
+    logger.error({ err: new Error(`bad token ${ghp}`) }, "failed");
+    expect(lines.join("\n")).not.toContain(ghp);
+  });
+
+  it("logs a circular object without throwing", () => {
+    const { logger, lines } = capture();
+    const ghp = `ghp_${"e".repeat(36)}`;
+    const loop: Record<string, unknown> = { note: ghp };
+    loop["self"] = loop;
+    const err = Object.assign(new Error("cyclic"), { ctx: loop });
+    expect(() => logger.info({ loop }, "cycle")).not.toThrow();
+    expect(() => logger.error({ err }, "cycle")).not.toThrow();
+    expect(lines.join("\n")).not.toContain(ghp);
+  });
+
+  it("keeps an Error's class and cause, with the cause scrubbed", () => {
+    class ProviderError extends Error {
+      override name = "ProviderError";
+    }
+    const { logger, lines, records } = capture();
+    const ghp = `ghp_${"f".repeat(36)}`;
+    const err = new ProviderError("call failed", { cause: new TypeError(`root ${ghp}`) });
+    logger.error({ err }, "failed");
+    const logged = records()[0]?.["err"] as Record<string, unknown>;
+    expect(logged["type"]).toBe("ProviderError");
+    expect(lines.join("\n")).toContain("root [REDACTED]");
+    expect(lines.join("\n")).not.toContain(ghp);
+  });
+
+  it("leaves ordinary values alone", () => {
+    const { logger, records } = capture();
+    const id = "3f2b6c1e-8a4d-4c2b-9e7f-1a2b3c4d5e6f";
+    runWithTrace(id, () => logger.info({ id, word: "ghost_writer" }, "plain message"));
+    expect(records()[0]).toMatchObject({
+      id,
+      word: "ghost_writer",
+      msg: "plain message",
+      trace_id: id,
+    });
   });
 
   it("respects the configured level", () => {

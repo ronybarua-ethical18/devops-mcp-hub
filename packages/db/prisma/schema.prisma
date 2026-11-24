@@ -188,6 +188,7 @@ model ProjectConnection {
 
   @@unique([projectId, integrationId, externalRef])
   @@index([orgId])
+  @@index([orgId, integrationId])
   @@map("project_connections")
 }
 
@@ -207,6 +208,7 @@ model Credential {
   integration   Integration  @relation(fields: [orgId, integrationId], references: [orgId, id], onDelete: Cascade)
 
   @@index([orgId])
+  @@index([orgId, integrationId])
   @@map("credentials")
 }
 
@@ -247,6 +249,8 @@ model ToolCall {
 
   @@index([orgId, createdAt])
   @@index([traceId])
+  @@index([userId])
+  @@index([mcpClientId])
   @@map("tool_calls")
 }
 
@@ -284,6 +288,7 @@ model Approval {
   proposal     Proposal         @relation(fields: [orgId, proposalId], references: [orgId, id], onDelete: Cascade)
 
   @@index([orgId])
+  @@index([orgId, proposalId])
   @@map("approvals")
 }
 
@@ -323,6 +328,7 @@ model WorkflowStep {
 
 // Append-only: a database trigger rejects UPDATE and DELETE (see migrations).
 // Retention: audit_events are kept 1 year; a later phase's purge job will use a privileged function.
+// The append-only trigger does not stop the table's owner role (see docs/threat-model.md).
 model AuditEvent {
   id           String       @id @default(uuid()) @db.Uuid
   orgId        String       @map("org_id") @db.Uuid

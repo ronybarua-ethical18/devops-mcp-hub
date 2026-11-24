@@ -137,6 +137,36 @@ describe("schema.prisma", () => {
     }
   });
 
+  it("indexes foreign-key columns that no other index leads with", () => {
+    const expected: Array<[string, string]> = [
+      ["ProjectConnection", "@@index([orgId, integrationId])"],
+      ["Credential", "@@index([orgId, integrationId])"],
+      ["Approval", "@@index([orgId, proposalId])"],
+      ["ToolCall", "@@index([userId])"],
+      ["ToolCall", "@@index([mcpClientId])"],
+    ];
+    for (const [model, line] of expected) {
+      expect(
+        byName(model).lines.some((l) => l.startsWith(line)),
+        `${model} ${line}`,
+      ).toBe(true);
+    }
+    const migrations = join(root, "prisma", "migrations");
+    const sql = readdirSync(migrations, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => readFileSync(join(migrations, d.name, "migration.sql"), "utf8"))
+      .join("\n");
+    for (const name of [
+      "project_connections_org_id_integration_id_idx",
+      "credentials_org_id_integration_id_idx",
+      "approvals_org_id_proposal_id_idx",
+      "tool_calls_user_id_idx",
+      "tool_calls_mcp_client_id_idx",
+    ]) {
+      expect(sql, name).toContain(`CREATE INDEX "${name}"`);
+    }
+  });
+
   it("limits memberships to one owner row per user", () => {
     const membership = byName("Membership");
     expect(membership.fields.find((f) => f.name === "userId")?.line).toContain("@unique");

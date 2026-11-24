@@ -100,6 +100,59 @@ describe("scopeArgs: foreign orgId", () => {
   });
 });
 
+describe("scopeArgs: compound keys and cursor", () => {
+  it("rejects another org inside a compound unique key", () => {
+    const key = { orgId_slug: { orgId: OTHER, slug: "web" } };
+    expect(() => scopeArgs("Project", "findUnique", { where: key }, ORG)).toThrow(
+      TenantViolationError,
+    );
+    expect(() =>
+      scopeArgs(
+        "Project",
+        "upsert",
+        { where: key, create: { name: "w", slug: "web" }, update: {} },
+        ORG,
+      ),
+    ).toThrow(TenantViolationError);
+    expect(() =>
+      scopeArgs(
+        "Project",
+        "findMany",
+        { where: { OR: [{ orgId_id: { orgId: OTHER, id: "p" } }] } },
+        ORG,
+      ),
+    ).toThrow(TenantViolationError);
+  });
+
+  it("allows a compound unique key with the scope's own org", () => {
+    const where = { orgId_slug: { orgId: ORG, slug: "web" } };
+    expect(scopeArgs("Project", "findUnique", { where }, ORG)).toEqual({
+      where: { ...where, orgId: ORG },
+    });
+  });
+
+  it("adds orgId to a cursor and rejects a foreign one", () => {
+    expect(scopeArgs("Project", "findMany", { cursor: { id: "p1" }, take: 2 }, ORG)).toEqual({
+      cursor: { id: "p1", orgId: ORG },
+      take: 2,
+      where: { orgId: ORG },
+    });
+    for (const cursor of [{ id: "p", orgId: OTHER }, { orgId_id: { orgId: OTHER, id: "p" } }]) {
+      expect(() => scopeArgs("Project", "findMany", { cursor }, ORG)).toThrow(TenantViolationError);
+    }
+  });
+
+  it("forces an organization cursor onto the scope's own row", () => {
+    expect(scopeArgs("Organization", "findMany", { cursor: { id: ORG } }, ORG)).toEqual({
+      cursor: { id: ORG },
+      where: { id: ORG },
+    });
+    expect(() => scopeArgs("Organization", "findMany", { cursor: { id: OTHER } }, ORG)).toThrow(
+      TenantViolationError,
+    );
+  });
+});
+
 describe("scopeArgs: relations and unknown operations", () => {
   it("rejects include, relational select, _count and nested writes", () => {
     const bad: unknown[] = [

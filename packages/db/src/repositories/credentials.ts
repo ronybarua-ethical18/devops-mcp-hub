@@ -1,9 +1,16 @@
 // Saves provider tokens encrypted, and decrypts them again when they are needed.
-// Every lookup is limited to one org, so one org can never read another org's tokens.
+// Every lookup is limited to one org, and every decrypt is written to the audit log.
 
 import { randomUUID } from "node:crypto";
 import { openSecret, sealSecret, type MasterKey } from "../crypto/envelope.js";
 import type { TenantClient } from "../tenant/client.js";
+import type { AuditRepo } from "./audit.js";
+
+/** Who is revealing a credential, and under which trace: recorded in the audit event. */
+export interface RevealContext {
+  actorId: string;
+  traceId: string;
+}
 
 export interface CredentialsRepo {
   /** Seal and store a provider token. Returns the new credential's id. */
@@ -12,14 +19,18 @@ export interface CredentialsRepo {
     plaintext: string;
     expiresAt?: Date;
   }): Promise<{ id: string }>;
-  /** Decrypt a credential. Null when the id is unknown or belongs to another org. */
-  reveal(id: string): Promise<string | null>;
+  /**
+   * Decrypt a credential. Null when the id is unknown or belongs to another org.
+   * Always appends a `credential.reveal` audit event first; no event, no token.
+   */
+  reveal(id: string, ctx: RevealContext): Promise<string | null>;
 }
 
 export function createCredentialsRepo(
   db: TenantClient,
   orgId: string,
   master: MasterKey,
+  audit: AuditRepo,
 ): CredentialsRepo {
   const aadFor = (id: string): string => `${orgId}:${id}`;
 
@@ -50,19 +61,36 @@ export function createCredentialsRepo(
       return { id };
     },
 
-    async reveal(id) {
+    async reveal(id, { actorId, traceId }) {
+      // The event names the credential id only, never the value.
+      const record = (outcome: "ok" | "not_found" | "error") =>
+        audit.append({ actorId, action: "credential.reveal", target: id, outcome, traceId });
       const row = await db.credential.findFirst({ where: { id } });
-      if (!row) return null;
-      return openSecret(
-        {
-          ciphertext: Buffer.from(row.ciphertext),
-          iv: Buffer.from(row.iv),
-          wrappedDek: Buffer.from(row.wrappedDek),
-          keyVersion: row.keyVersion,
-        },
-        aadFor(row.id),
-        master,
-      );
+      if (!row) {
+        await record("not_found");
+        return null;
+      }
+      let plaintext: string;
+      try {
+        plaintext = openSecret(
+          {
+            ciphertext: Buffer.from(row.ciphertext),
+            iv: Buffer.from(row.iv),
+            wrappedDek: Buffer.from(row.wrappedDek),
+            keyVersion: row.keyVersion,
+          },
+          aadFor(row.id),
+          master,
+        );
+      } catch (error) {
+        // If the audit write fails too, still surface the decryption error: it is the real cause.
+        // Nothing is returned either way, so this stays fail-closed.
+        await record("error").catch(() => undefined);
+        throw error;
+      }
+      // Written before the token leaves this function: if the audit write fails, nothing is returned.
+      await record("ok");
+      return plaintext;
     },
   };
 }

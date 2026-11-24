@@ -19,8 +19,9 @@ export interface OrgRepositories {
 /** The only way application code reaches tenant data: every query is forced into `orgId`. */
 export function forOrg(prisma: PrismaClient, orgId: string, deps: RepoDeps): OrgRepositories {
   const db = createTenantClient(prisma, orgId);
+  const audit = createAuditRepo(db, orgId);
   return {
-    credentials: createCredentialsRepo(db, orgId, deps.master),
-    audit: createAuditRepo(db, orgId),
+    credentials: createCredentialsRepo(db, orgId, deps.master, audit),
+    audit,
   };
 }
