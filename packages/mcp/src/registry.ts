@@ -87,5 +87,30 @@ function checkDefinitions<Ctx>(tools: readonly HubTool<Ctx>[]): void {
     if (z.toJSONSchema(tool.inputSchema, { io: "input" }).additionalProperties !== false) {
       throw new Error(`Tool ${tool.name} must use z.strictObject for its input schema`);
     }
+    // Stripping undeclared output keys only works if no object in the schema lets them through.
+    if (allowsUndeclaredKeys(z.toJSONSchema(tool.outputSchema, { io: "output" }))) {
+      throw new Error(
+        `Tool ${tool.name} has an output schema that keeps undeclared keys: use z.object, not z.looseObject, catchall or z.record`,
+      );
+    }
   }
+}
+
+/** True if any object in a JSON Schema accepts keys it does not declare (loose, catchall or record). */
+function allowsUndeclaredKeys(node: unknown): boolean {
+  if (typeof node !== "object" || node === null) return false;
+  if (Array.isArray(node)) return node.some(allowsUndeclaredKeys);
+  const schema = node as Record<string, unknown>;
+  const isObject = schema.type === "object" || "properties" in schema;
+  if (isObject && schema.additionalProperties !== false) return true;
+  const children = [
+    ...Object.values((schema.properties as Record<string, unknown> | undefined) ?? {}),
+    ...Object.values((schema.$defs as Record<string, unknown> | undefined) ?? {}),
+    schema.items,
+    schema.prefixItems,
+    schema.anyOf,
+    schema.oneOf,
+    schema.allOf,
+  ];
+  return children.some(allowsUndeclaredKeys);
 }

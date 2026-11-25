@@ -213,7 +213,58 @@ describe("createHubServer definition checks", () => {
     expect(make([loose])).toThrow(/github_loose/);
   });
 
+  // A loose output schema keeps undeclared keys through the parse, so a stray token would reach the client.
+  it("rejects an output schema that lets undeclared keys through, at any depth", () => {
+    const withOutput = (outputSchema: z.ZodObject) =>
+      defineTool<Ctx, z.ZodObject, z.ZodObject>({
+        name: "github_out",
+        title: "Fake",
+        description: "A fake tool.",
+        inputSchema: z.strictObject({}),
+        outputSchema,
+        annotations,
+        summarize: () => "x",
+        run: async () => ({}),
+      });
+    const nested = z.looseObject({ a: z.string() });
+    for (const schema of [
+      z.looseObject({ repo: z.string() }),
+      z.object({ repo: z.string() }).catchall(z.string()),
+      z.object({ items: z.array(nested) }),
+      z.object({ meta: nested.nullable() }),
+      z.object({ byName: z.record(z.string(), z.string()) }),
+    ]) {
+      expect(make([withOutput(schema)])).toThrow(/github_out/);
+    }
+  });
+
   it("accepts good definitions", () => {
     expect(make([ok("hub_whoami"), ok("github_list_pull_requests")])).not.toThrow();
+
+    const nestedOutput = z.object({
+      items: z.array(z.object({ number: z.number(), author: z.string().nullable() })),
+      stats: z.object({ total: z.number() }).nullable(),
+      untrusted_content: z.object({ titles: z.array(z.string()) }),
+    });
+    const nestedTool = defineTool<Ctx, z.ZodObject, typeof nestedOutput>({
+      name: "github_nested",
+      title: "Fake",
+      description: "A fake tool with nested output.",
+      inputSchema: z.strictObject({ state: z.enum(["open", "closed"]).default("open") }),
+      outputSchema: nestedOutput,
+      annotations,
+      summarize: () => "x",
+      run: async () => ({ items: [], stats: null, untrusted_content: { titles: [] } }),
+    });
+    expect(make([nestedTool])).not.toThrow();
+  });
+});
+
+describe("@hub/mcp entry", () => {
+  it("exports the registry", async () => {
+    const entry = await import("../src/index.js");
+    expect(entry.createHubServer).toBe(createHubServer);
+    expect(entry.TOOLS_LIST_CACHE_HINT).toBe(TOOLS_LIST_CACHE_HINT);
+    expect(entry.TOOL_NAME_PATTERN).toBeInstanceOf(RegExp);
   });
 });
