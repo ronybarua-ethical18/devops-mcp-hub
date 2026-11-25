@@ -10,6 +10,18 @@ Closes #<issue-number>
 - <package/app>: <change>
 - <package/app>: <change>
 
+## Step by step: what the code does (`<main file>`)
+
+<!-- Walk the PR's main runtime flow in the order the code runs. Each step: the function or call,
+     the real values (endpoint, header, claim, timeout, cache margin) and why, in a few words.
+     End with where the real work happens and what does or doesn't travel there.
+     Docs-only PR: walk the process the docs describe. Several flows: walk the main one. -->
+
+1. <step>: <function/call, real values>. <why>
+   - <field>: <meaning>
+2. <step>
+3. <where the real work happens, and what is / is not sent>
+
 ## How to test
 
 <!-- Steps a reviewer can copy and run to check this PR themselves. -->

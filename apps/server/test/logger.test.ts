@@ -100,6 +100,21 @@ describe("logger", () => {
     for (const s of [ghp, pat, sentry, "PGSECRET"]) expect(out).not.toContain(s);
   });
 
+  it("scrubs a PEM private key, including one split over several lines", () => {
+    const { logger, lines } = capture();
+    const pem = [
+      "-----BEGIN RSA PRIVATE KEY-----",
+      "MIIEowIBAAKCAQEAPEMBODYLINE1",
+      "PEMBODYLINE2",
+      "-----END RSA PRIVATE KEY-----",
+    ].join("\n");
+    logger.info({ note: `key was ${pem}` }, `loaded ${pem}`);
+    const out = lines.join("\n");
+    for (const s of ["PEMBODYLINE1", "PEMBODYLINE2", "BEGIN RSA PRIVATE KEY"]) {
+      expect(out).not.toContain(s);
+    }
+  });
+
   it("scrubs a token from an Error message and stack", () => {
     const { logger, lines } = capture();
     const ghp = `ghp_${"d".repeat(36)}`;

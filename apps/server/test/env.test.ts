@@ -84,4 +84,87 @@ describe("loadEnv", () => {
     }
     expect(error.variables.sort()).toEqual(["DATABASE_URL", "HUB_MASTER_KEY", "PORT"]);
   });
+
+  describe("GitHub App settings", () => {
+    const pem = "-----BEGIN RSA PRIVATE KEY-----\nMIIEFAKEBODY\n-----END RSA PRIVATE KEY-----";
+
+    it("leaves GitHub unset when neither variable is given", () => {
+      expect(loadEnv(valid).GITHUB_APP).toBeUndefined();
+    });
+
+    it("loads the app id and key, turning escaped \\n into real newlines", () => {
+      const env = loadEnv({
+        ...valid,
+        GITHUB_APP_ID: "123456",
+        GITHUB_APP_PRIVATE_KEY: pem.replaceAll("\n", "\\n"),
+      });
+      expect(env.GITHUB_APP).toEqual({ appId: "123456", privateKey: pem });
+    });
+
+    it("needs both variables or neither", () => {
+      expect(failure({ ...valid, GITHUB_APP_ID: "123456" }).variables).toEqual([
+        "GITHUB_APP_PRIVATE_KEY",
+      ]);
+      expect(failure({ ...valid, GITHUB_APP_PRIVATE_KEY: pem }).variables).toEqual([
+        "GITHUB_APP_ID",
+      ]);
+    });
+
+    it("rejects a non-numeric app id and a key that is not a PEM private key", () => {
+      expect(
+        failure({ ...valid, GITHUB_APP_ID: "abc", GITHUB_APP_PRIVATE_KEY: pem }).variables,
+      ).toEqual(["GITHUB_APP_ID"]);
+      expect(
+        failure({ ...valid, GITHUB_APP_ID: "1", GITHUB_APP_PRIVATE_KEY: "not-a-key-SECRETKEY" })
+          .variables,
+      ).toEqual(["GITHUB_APP_PRIVATE_KEY"]);
+    });
+
+    it("never echoes the private key in an error", () => {
+      const error = failure({
+        ...valid,
+        GITHUB_APP_ID: "1",
+        GITHUB_APP_PRIVATE_KEY: "oops-SECRETKEY",
+      });
+      expect(`${error.message} ${error.variables.join(" ")}`).not.toContain("SECRETKEY");
+    });
+  });
+
+  describe("dev auth settings", () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const userId = "22222222-2222-4222-8222-222222222222";
+    const dev = { DEV_AUTH_ORG_ID: orgId, DEV_AUTH_USER_ID: userId };
+
+    it("leaves dev auth unset by default", () => {
+      expect(loadEnv(valid).DEV_AUTH).toBeUndefined();
+    });
+
+    it("loads an org and user id when NODE_ENV is explicitly development or test", () => {
+      expect(loadEnv({ ...valid, ...dev, NODE_ENV: "development" }).DEV_AUTH).toEqual({
+        orgId,
+        userId,
+      });
+      expect(loadEnv({ ...valid, ...dev, NODE_ENV: "test" }).DEV_AUTH).toEqual({ orgId, userId });
+    });
+
+    it("needs both ids or neither, and both must be UUIDs", () => {
+      const env = { ...valid, NODE_ENV: "development" };
+      expect(failure({ ...env, DEV_AUTH_ORG_ID: orgId }).variables).toEqual(["DEV_AUTH_USER_ID"]);
+      expect(failure({ ...env, DEV_AUTH_USER_ID: userId }).variables).toEqual(["DEV_AUTH_ORG_ID"]);
+      expect(failure({ ...env, ...dev, DEV_AUTH_ORG_ID: "not-a-uuid" }).variables).toEqual([
+        "DEV_AUTH_ORG_ID",
+      ]);
+    });
+
+    it("refuses to start with dev auth in production", () => {
+      const error = failure({ ...valid, ...dev, NODE_ENV: "production" });
+      expect(error.variables).toEqual(["DEV_AUTH_ORG_ID", "DEV_AUTH_USER_ID"]);
+    });
+
+    it("refuses dev auth when NODE_ENV is unset, so a forgotten NODE_ENV fails closed", () => {
+      const error = failure({ ...valid, ...dev });
+      expect(error.variables).toEqual(["DEV_AUTH_ORG_ID", "DEV_AUTH_USER_ID"]);
+      expect(error.message).not.toContain(orgId);
+    });
+  });
 });
