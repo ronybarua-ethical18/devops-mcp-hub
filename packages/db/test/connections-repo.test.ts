@@ -88,3 +88,57 @@ describe("connections repository", () => {
     });
   });
 });
+
+describe("connections.list (paged allowlist)", () => {
+  const rows = ["c1", "c2", "c3"].map((id, i) => ({
+    id,
+    projectId: "p1",
+    integrationId: "i1",
+    externalRef: `acme/r${i}`,
+  }));
+
+  it("lists through active integrations, sorted, one extra row to detect more", async () => {
+    const { repo, findMany } = setup([github], rows);
+    const page = await repo.list("github", { limit: 2 });
+    expect(findMany).toHaveBeenCalledWith({
+      where: { integrationId: { in: ["i1"] } },
+      orderBy: [{ externalRef: "asc" }, { id: "asc" }],
+      take: 3,
+      select: { id: true, projectId: true, integrationId: true, externalRef: true },
+    });
+    expect(page.items.map((c) => c.connectionId)).toEqual(["c1", "c2"]);
+    expect(page.items[0]).toEqual({
+      connectionId: "c1",
+      projectId: "p1",
+      externalRef: "acme/r0",
+      integration: github,
+    });
+    expect(page.nextAfter).toBe("c2");
+  });
+
+  it("has no next page when fewer rows than limit + 1 come back", async () => {
+    const { repo } = setup([github], rows.slice(0, 2));
+    expect((await repo.list("github", { limit: 2 })).nextAfter).toBeNull();
+  });
+
+  it("continues after the given id", async () => {
+    const { repo, findMany } = setup([github], []);
+    await repo.list("github", { limit: 2, after: "c2" });
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ cursor: { id: "c2" }, skip: 1 }),
+    );
+  });
+
+  it("returns an empty page without querying when no active integration exists", async () => {
+    const { repo, findMany } = setup([], rows);
+    expect(await repo.list("github", { limit: 2 })).toEqual({ items: [], nextAfter: null });
+    expect(findMany).not.toHaveBeenCalled();
+  });
+
+  it("the query passes the tenant scope", async () => {
+    const { repo, findMany } = setup([github], []);
+    await repo.list("github", { limit: 2, after: "c2" });
+    const scoped = scopeArgs("ProjectConnection", "findMany", findMany.mock.calls[0]?.[0], "org-a");
+    expect(scoped).toMatchObject({ where: { orgId: "org-a" } });
+  });
+});

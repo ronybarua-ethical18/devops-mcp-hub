@@ -10,6 +10,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
+  "dependencies": {
+    "@hub/db": "workspace:*",
+    "@hub/integrations": "workspace:*"
+  },
   "devDependencies": {
     "typescript": "^5",
     "vitest": "5.1.0"
