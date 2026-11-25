@@ -192,6 +192,15 @@ describe.skipIf(!url)("integration and connection reads against Postgres", () =>
         externalRef: "acme/old",
       },
     });
+    // A real-world name with an underscore: it must still match itself after LIKE escaping.
+    await prisma.projectConnection.create({
+      data: {
+        orgId: orgA.id,
+        projectId: projectA.id,
+        integrationId: activeA.id,
+        externalRef: "acme/my_service",
+      },
+    });
     Object.assign(ids, {
       orgA: orgA.id,
       orgB: orgB.id,
@@ -231,6 +240,18 @@ describe.skipIf(!url)("integration and connection reads against Postgres", () =>
     expect(
       await forOrg(prisma, ids.orgC, deps).connections.findRepo("github", "acme/api"),
     ).toBeNull();
+  });
+
+  it("still finds a repo whose name contains an underscore", async () => {
+    // Guards the escaping: if Prisma ever escaped ILIKE input itself, this would double-escape.
+    const found = await forOrg(prisma, ids.orgA, deps).connections.findRepo(
+      "github",
+      "ACME/my_service",
+    );
+    expect(found).toMatchObject({
+      externalRef: "acme/my_service",
+      integration: { id: ids.activeA },
+    });
   });
 
   it("treats _ and % in the repo name as plain characters, not wildcards", async () => {
