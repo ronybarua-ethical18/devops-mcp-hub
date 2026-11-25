@@ -31,7 +31,7 @@ Project-wide instructions for Claude Code in this repository.
 
 ## 5. Security
 
-14. Never commit or read secrets (`.env*`, `*.pem`, `*.key`).
+14. Never commit secrets (`.env*`, `*.pem`, `*.key`). Read or use `.env*` values only after asking the user each time, and never print a secret value.
 15. Provider tokens never reach the MCP client or the model. Why: credential brokering is the hub's point; a leaked token defeats it.
 16. Every write action needs a policy check, an approval gate, and an audit entry under one trace ID.
 

@@ -14,12 +14,7 @@
       "Bash(gh issue view:*)",
       "Bash(gh issue list:*)"
     ],
-    "deny": [
-      "Read(./.env)",
-      "Read(./.env.*)",
-      "Read(./**/*.pem)",
-      "Read(./**/*.key)",
-      "Bash(git push:*)"
-    ]
+    "ask": ["Read(./.env.*)"],
+    "deny": ["Read(./.env)", "Read(./**/*.pem)", "Read(./**/*.key)", "Bash(git push:*)"]
   }
 }

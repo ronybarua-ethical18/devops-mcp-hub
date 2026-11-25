@@ -144,6 +144,7 @@ describe.skipIf(!url)("integration and connection reads against Postgres", () =>
     activeB: "",
     connA: "",
     connB: "",
+    projectA: "",
   };
   const deps = { master };
 
@@ -210,6 +211,7 @@ describe.skipIf(!url)("integration and connection reads against Postgres", () =>
       activeB: activeB.id,
       connA: connA.id,
       connB: connB.id,
+      projectA: projectA.id,
     });
   });
 
@@ -276,6 +278,47 @@ describe.skipIf(!url)("integration and connection reads against Postgres", () =>
     });
     const found = await forOrg(prisma, ids.orgA, deps).connections.findRepo("github", "acme/api");
     expect(found?.connectionId).toBe(ids.connA);
+  });
+
+  it("pages through the org's connections in name order", async () => {
+    const repo = forOrg(prisma, ids.orgA, deps).connections;
+    const seen: Array<{ id: string; ref: string; integrationId: string }> = [];
+    let after: string | undefined;
+    for (let pages = 0; pages < 10; pages += 1) {
+      const page = await repo.list("github", {
+        limit: 2,
+        ...(after === undefined ? {} : { after }),
+      });
+      expect(page.items.length).toBeLessThanOrEqual(2);
+      for (const c of page.items) {
+        seen.push({ id: c.connectionId, ref: c.externalRef, integrationId: c.integration.id });
+      }
+      if (page.nextAfter === null) break;
+      after = page.nextAfter;
+    }
+    const refs = seen.map((c) => c.ref);
+    expect(refs).toEqual([...refs].sort());
+    expect(refs).toContain("acme/api");
+    expect(refs).toContain("acme/my_service");
+    // Only active integrations of org A: never org B's row, never the revoked integration's.
+    expect(refs).not.toContain("acme/old");
+    expect(seen.map((c) => c.id)).not.toContain(ids.connB);
+    expect(new Set(seen.map((c) => c.integrationId))).toEqual(new Set([ids.activeA]));
+  });
+
+  it("returns an empty page when the cursor row was deleted", async () => {
+    const gone = await prisma.projectConnection.create({
+      data: {
+        orgId: ids.orgA,
+        projectId: ids.projectA,
+        integrationId: ids.activeA,
+        externalRef: "acme/zz-gone",
+      },
+    });
+    await prisma.projectConnection.delete({ where: { id: gone.id } });
+    expect(
+      await forOrg(prisma, ids.orgA, deps).connections.list("github", { limit: 2, after: gone.id }),
+    ).toEqual({ items: [], nextAfter: null });
   });
 
   it("ignores connections of a revoked integration", async () => {
