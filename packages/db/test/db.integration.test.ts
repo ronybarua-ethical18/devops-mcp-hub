@@ -131,3 +131,135 @@ describe.skipIf(!url)("tenant isolation and credentials against Postgres", () =>
     await expect(prisma.$executeRawUnsafe("TRUNCATE audit_events")).rejects.toThrow(/append-only/);
   });
 });
+
+describe.skipIf(!url)("integration and connection reads against Postgres", () => {
+  const prisma = createPrisma(url ?? "");
+  const run = randomUUID().slice(0, 8);
+  const ids = {
+    orgA: "",
+    orgB: "",
+    orgC: "",
+    activeA: "",
+    revokedA: "",
+    activeB: "",
+    connA: "",
+    connB: "",
+  };
+  const deps = { master };
+
+  beforeAll(async () => {
+    const orgA = await prisma.organization.create({ data: { name: "A", slug: `ra-${run}` } });
+    const orgB = await prisma.organization.create({ data: { name: "B", slug: `rb-${run}` } });
+    const github = { provider: "github" as const, scopes: ["contents:read"] };
+    const activeA = await prisma.integration.create({
+      data: { ...github, orgId: orgA.id, externalAccountId: "1001" },
+    });
+    const revokedA = await prisma.integration.create({
+      data: { ...github, orgId: orgA.id, externalAccountId: "1002", status: "revoked" },
+    });
+    const activeB = await prisma.integration.create({
+      data: { ...github, orgId: orgB.id, externalAccountId: "2001" },
+    });
+    const orgC = await prisma.organization.create({ data: { name: "C", slug: `rc-${run}` } });
+    const projectA = await prisma.project.create({
+      data: { orgId: orgA.id, name: "a", slug: "a" },
+    });
+    const projectB = await prisma.project.create({
+      data: { orgId: orgB.id, name: "b", slug: "b" },
+    });
+    // Both orgs connect the same repo; org A also has a repo only behind its revoked integration.
+    const connA = await prisma.projectConnection.create({
+      data: {
+        orgId: orgA.id,
+        projectId: projectA.id,
+        integrationId: activeA.id,
+        externalRef: "acme/api",
+      },
+    });
+    const connB = await prisma.projectConnection.create({
+      data: {
+        orgId: orgB.id,
+        projectId: projectB.id,
+        integrationId: activeB.id,
+        externalRef: "acme/api",
+      },
+    });
+    await prisma.projectConnection.create({
+      data: {
+        orgId: orgA.id,
+        projectId: projectA.id,
+        integrationId: revokedA.id,
+        externalRef: "acme/old",
+      },
+    });
+    Object.assign(ids, {
+      orgA: orgA.id,
+      orgB: orgB.id,
+      orgC: orgC.id,
+      activeA: activeA.id,
+      revokedA: revokedA.id,
+      activeB: activeB.id,
+      connA: connA.id,
+      connB: connB.id,
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  it("lists only the org's own active integrations", async () => {
+    expect(await forOrg(prisma, ids.orgA, deps).integrations.listActive("github")).toEqual([
+      { id: ids.activeA, provider: "github", externalAccountId: "1001" },
+    ]);
+    const forB = await forOrg(prisma, ids.orgB, deps).integrations.listActive();
+    expect(forB.map((i) => i.id)).toEqual([ids.activeB]);
+  });
+
+  it("finds the org's own connection, case-insensitively", async () => {
+    const found = await forOrg(prisma, ids.orgA, deps).connections.findRepo("github", "ACME/api");
+    expect(found).toMatchObject({
+      connectionId: ids.connA,
+      externalRef: "acme/api",
+      integration: { id: ids.activeA, externalAccountId: "1001" },
+    });
+  });
+
+  it("never resolves another org's connection", async () => {
+    const forB = await forOrg(prisma, ids.orgB, deps).connections.findRepo("github", "acme/api");
+    expect(forB).toMatchObject({ connectionId: ids.connB, integration: { id: ids.activeB } });
+    expect(
+      await forOrg(prisma, ids.orgC, deps).connections.findRepo("github", "acme/api"),
+    ).toBeNull();
+  });
+
+  it("treats _ and % in the repo name as plain characters, not wildcards", async () => {
+    const a = forOrg(prisma, ids.orgA, deps).connections;
+    expect(await a.findRepo("github", "acme/a_i")).toBeNull();
+    expect(await a.findRepo("github", "acme/%")).toBeNull();
+    expect(await a.findRepo("github", "%")).toBeNull();
+  });
+
+  it("returns the oldest connection when the repo is in two projects", async () => {
+    // Created after connA in its own statement, so its created_at is later.
+    const project2 = await prisma.project.create({
+      data: { orgId: ids.orgA, name: "a2", slug: "a2" },
+    });
+    await prisma.projectConnection.create({
+      data: {
+        orgId: ids.orgA,
+        projectId: project2.id,
+        integrationId: ids.activeA,
+        externalRef: "acme/api",
+      },
+    });
+    const found = await forOrg(prisma, ids.orgA, deps).connections.findRepo("github", "acme/api");
+    expect(found?.connectionId).toBe(ids.connA);
+  });
+
+  it("ignores connections of a revoked integration", async () => {
+    expect(
+      await forOrg(prisma, ids.orgA, deps).connections.findRepo("github", "acme/old"),
+    ).toBeNull();
+  });
+});

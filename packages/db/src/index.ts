@@ -4,6 +4,12 @@ export { createPrisma } from "./client.js";
 export { parseMasterKey, type MasterKey } from "./crypto/envelope.js";
 export { forOrg, type OrgRepositories, type RepoDeps } from "./repositories/index.js";
 export type { AuditEventInput, AuditRepo } from "./repositories/audit.js";
+export type { ConnectionsRepo, RepoConnection } from "./repositories/connections.js";
 export type { CredentialsRepo, RevealContext } from "./repositories/credentials.js";
+export type {
+  ActiveIntegration,
+  IntegrationsRepo,
+  ProviderName,
+} from "./repositories/integrations.js";
 export { TenantViolationError } from "./tenant/scope.js";
 export type { PrismaClient } from "./generated/client.js";
