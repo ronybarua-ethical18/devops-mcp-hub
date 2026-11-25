@@ -12,7 +12,7 @@ CLAUDE.md rule 17 requires this plan to be written in `docs/superpowers/plans/` 
 ## Decisions (confirmed)
 
 1. **HTTP stack:** keep Fastify. Serve `/mcp` through `createMcpHonoApp` (ADR 0001, Host/Origin validation) from `@modelcontextprotocol/hono`, bridged into Fastify by forwarding the raw request to the Hono Fetch handler. Reference: `spikes/sdk-server/src/http.ts`.
-2. **Auth in #3:** an env-gated dev auth context (fixed `orgId`/`userId`), refused when `NODE_ENV=production`, behind an `AuthContext` interface that #4 replaces with the token verifier. Tenant never comes from tool arguments.
+2. **Auth in #3:** an env-gated dev auth context (fixed `orgId`/`userId`), accepted only when `NODE_ENV` is explicitly `development` or `test` (production or an unset `NODE_ENV` refuses to start), behind an `AuthContext` interface that #4 replaces with the token verifier. Tenant never comes from tool arguments.
 3. **GitHub App credentials:** App id and private key in env; mint 1-hour installation tokens per call with an in-memory cache. Installation id in `Integration.externalAccountId`; picked repos in `ProjectConnection.externalRef` (`owner/repo`). **No migration.**
 
 ## Global constraints
@@ -34,7 +34,7 @@ CLAUDE.md rule 17 requires this plan to be written in `docs/superpowers/plans/` 
 6. **No full diffs:** `github_get_commit` returns file names/status/counts only, bounded file count.
 7. **Untrusted content:** PR titles/bodies, commit messages go only in `untrusted_content`.
 8. **Token hygiene:** installation token and PEM never appear in logs, errors or tool output.
-9. **Dev auth in prod:** server refuses to start with dev auth when `NODE_ENV=production`.
+9. **Dev auth in prod:** server refuses to start with dev auth unless `NODE_ENV` is explicitly `development` or `test`, so a forgotten `NODE_ENV` fails closed.
 
 ## File structure
 

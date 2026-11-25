@@ -73,7 +73,10 @@ export interface CommitSummary {
   authorLogin: string | null;
   date: string | null;
   stats: { additions: number; deletions: number; total: number } | null;
+  /** First page of changed files only (GitHub sends at most 300 per page). */
   files: ChangedFile[];
+  /** True when GitHub has more file pages, so `files` is not the full list. */
+  filesTruncated: boolean;
 }
 
 export interface GithubClient {
@@ -227,6 +230,8 @@ export function createGithubClient(options: GithubClientOptions): GithubClient {
           additions: f.additions,
           deletions: f.deletions,
         })),
+        // Deliberately one page: say so instead of passing a cut list off as complete.
+        filesTruncated: nextCursor(response.headers.get("link")) !== null,
       };
     },
   };

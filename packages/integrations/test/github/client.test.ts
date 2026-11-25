@@ -187,8 +187,25 @@ describe("getCommit", () => {
         { filename: "src/old.ts", status: "removed", additions: 0, deletions: 1 },
         { filename: "logo.png", status: "added", additions: 1, deletions: 0 },
       ],
+      filesTruncated: false,
     });
     expect(JSON.stringify(commit)).not.toContain(DIFF_MARKER);
+  });
+
+  it("flags the file list as truncated when GitHub has more file pages", async () => {
+    server.use(
+      http.get(`${API}/repos/acme/api/commits/${COMMIT_SHA}`, () =>
+        HttpResponse.json(commitBody, {
+          headers: {
+            link: `<${API}/repos/acme/api/commits/${COMMIT_SHA}?page=2>; rel="next", <${API}/repos/acme/api/commits/${COMMIT_SHA}?page=10>; rel="last"`,
+          },
+        }),
+      ),
+    );
+    const { client } = setup();
+    const commit = await client.getCommit(FAKE_INSTALLATION_ID, acme, COMMIT_SHA);
+    expect(commit.filesTruncated).toBe(true);
+    expect(commit.files).toHaveLength(3);
   });
 });
 

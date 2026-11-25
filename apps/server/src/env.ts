@@ -40,7 +40,8 @@ const pemPrivateKey = z
 
 const schema = z
   .object({
-    NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+    // No schema default: dev auth must see whether NODE_ENV was really set. loadEnv applies it.
+    NODE_ENV: z.enum(["development", "test", "production"]).optional(),
     PORT: port.optional(),
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
     DATABASE_URL: z
@@ -73,12 +74,19 @@ const schema = z
         ctx.addIssue({ code: "custom", path: [a], message: "required together" });
       }
     }
+    // Dev auth fixes the tenant for every request, so it fails closed: it needs NODE_ENV set
+    // explicitly to development or test. Production, or a forgotten NODE_ENV, refuses to start.
+    const explicitDev = value.NODE_ENV === "development" || value.NODE_ENV === "test";
     if (
-      value.NODE_ENV === "production" &&
+      !explicitDev &&
       (value.DEV_AUTH_ORG_ID !== undefined || value.DEV_AUTH_USER_ID !== undefined)
     ) {
       for (const name of ["DEV_AUTH_ORG_ID", "DEV_AUTH_USER_ID"]) {
-        ctx.addIssue({ code: "custom", path: [name], message: "not allowed in production" });
+        ctx.addIssue({
+          code: "custom",
+          path: [name],
+          message: "needs NODE_ENV=development or test",
+        });
       }
     }
   });
@@ -92,6 +100,7 @@ export function loadEnv(source: Record<string, string | undefined>): Env {
     throw new EnvError([...names]);
   }
   const {
+    NODE_ENV,
     PORT,
     GITHUB_APP_ID,
     GITHUB_APP_PRIVATE_KEY,
@@ -99,7 +108,7 @@ export function loadEnv(source: Record<string, string | undefined>): Env {
     DEV_AUTH_USER_ID,
     ...rest
   } = result.data;
-  const env: Env = { ...rest, PORT: PORT ?? 4000 };
+  const env: Env = { ...rest, NODE_ENV: NODE_ENV ?? "development", PORT: PORT ?? 4000 };
   if (GITHUB_APP_ID !== undefined && GITHUB_APP_PRIVATE_KEY !== undefined) {
     env.GITHUB_APP = { appId: GITHUB_APP_ID, privateKey: GITHUB_APP_PRIVATE_KEY };
   }

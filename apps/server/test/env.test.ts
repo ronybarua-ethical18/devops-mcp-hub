@@ -139,17 +139,19 @@ describe("loadEnv", () => {
       expect(loadEnv(valid).DEV_AUTH).toBeUndefined();
     });
 
-    it("loads an org and user id outside production", () => {
-      expect(loadEnv({ ...valid, ...dev }).DEV_AUTH).toEqual({ orgId, userId });
+    it("loads an org and user id when NODE_ENV is explicitly development or test", () => {
+      expect(loadEnv({ ...valid, ...dev, NODE_ENV: "development" }).DEV_AUTH).toEqual({
+        orgId,
+        userId,
+      });
       expect(loadEnv({ ...valid, ...dev, NODE_ENV: "test" }).DEV_AUTH).toEqual({ orgId, userId });
     });
 
     it("needs both ids or neither, and both must be UUIDs", () => {
-      expect(failure({ ...valid, DEV_AUTH_ORG_ID: orgId }).variables).toEqual(["DEV_AUTH_USER_ID"]);
-      expect(failure({ ...valid, DEV_AUTH_USER_ID: userId }).variables).toEqual([
-        "DEV_AUTH_ORG_ID",
-      ]);
-      expect(failure({ ...valid, ...dev, DEV_AUTH_ORG_ID: "not-a-uuid" }).variables).toEqual([
+      const env = { ...valid, NODE_ENV: "development" };
+      expect(failure({ ...env, DEV_AUTH_ORG_ID: orgId }).variables).toEqual(["DEV_AUTH_USER_ID"]);
+      expect(failure({ ...env, DEV_AUTH_USER_ID: userId }).variables).toEqual(["DEV_AUTH_ORG_ID"]);
+      expect(failure({ ...env, ...dev, DEV_AUTH_ORG_ID: "not-a-uuid" }).variables).toEqual([
         "DEV_AUTH_ORG_ID",
       ]);
     });
@@ -157,6 +159,12 @@ describe("loadEnv", () => {
     it("refuses to start with dev auth in production", () => {
       const error = failure({ ...valid, ...dev, NODE_ENV: "production" });
       expect(error.variables).toEqual(["DEV_AUTH_ORG_ID", "DEV_AUTH_USER_ID"]);
+    });
+
+    it("refuses dev auth when NODE_ENV is unset, so a forgotten NODE_ENV fails closed", () => {
+      const error = failure({ ...valid, ...dev });
+      expect(error.variables).toEqual(["DEV_AUTH_ORG_ID", "DEV_AUTH_USER_ID"]);
+      expect(error.message).not.toContain(orgId);
     });
   });
 });
