@@ -166,6 +166,9 @@ importers:
 
   packages/mcp:
     dependencies:
+      '@hub/core':
+        specifier: workspace:*
+        version: link:../core
       '@modelcontextprotocol/server':
         specifier: 2.4.0
         version: 2.4.0
@@ -173,6 +176,9 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
+      '@modelcontextprotocol/client':
+        specifier: 2.4.0
+        version: 2.4.0
       typescript:
         specifier: ^5
         version: 5.9.3
@@ -2546,9 +2552,6 @@ packages:
   jose@6.2.16:
     resolution: {integrity: sha512-4LSJpbuBuPdGrONCdZUy0xnxtLf8eEz+EY0SMXdHQEBU7bgUHDVblU/JAjryv3wID9/LK7/YuwFwq+AQNfMscQ==}
 
-  jose@6.2.18:
-    resolution: {integrity: sha512-doV4thUwgkrycJH4yLeqwTGIIZphHl+pk7CPReuMIhYhncmgzdko85MaCG4YQFTxqMFr1/oEH32tZuKKovcDEg==}
-
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
@@ -4153,7 +4156,7 @@ snapshots:
       cross-spawn: 7.0.6
       eventsource: 3.0.7
       eventsource-parser: 3.1.1
-      jose: 6.2.18
+      jose: 6.2.16
       pkce-challenge: 5.0.1
       zod: 4.6.7
 
@@ -6041,8 +6044,6 @@ snapshots:
   jiti@2.7.0: {}
 
   jose@6.2.16: {}
-
-  jose@6.2.18: {}
 
   js-tokens@4.0.0: {}
 
