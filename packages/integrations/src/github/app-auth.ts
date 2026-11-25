@@ -53,17 +53,12 @@ export function createInstallationTokenProvider(
 
   function privateKey(): KeyObject {
     if (key !== undefined) return key;
-    // Retry once: after an aborted request Node sometimes fails a good key with a stale OpenSSL
-    // error ("asn1 encoding routines::too long"); the first failure clears it. A bad key fails twice.
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        key = createPrivateKey(options.privateKey);
-        return key;
-      } catch {
-        // try again, then give up below
-      }
+    try {
+      key = createPrivateKey(options.privateKey);
+      return key;
+    } catch {
+      throw new GithubError("unauthorized", { detail: "private key is not usable" });
     }
-    throw new GithubError("unauthorized", { detail: "private key is not usable" });
   }
 
   async function appJwt(): Promise<string> {

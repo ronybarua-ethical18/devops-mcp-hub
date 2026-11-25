@@ -6,6 +6,7 @@ import { HttpResponse, delay, http } from "msw";
 import { createInstallationTokenProvider } from "../../src/github/app-auth.js";
 import { createGithubClient, type GithubClient } from "../../src/github/client.js";
 import { GithubError } from "../../src/github/errors.js";
+import { DEFAULT_BASE_URL } from "../../src/github/http.js";
 import {
   COMMIT_SHA,
   DIFF_MARKER,
@@ -15,10 +16,9 @@ import {
   pullsBody,
   reposBody,
 } from "./fixtures.js";
-import { APP_ID, makeKeys, server, tokenEndpoint } from "./msw.js";
+import { API, APP_ID, makeKeys, server, tokenEndpoint } from "./msw.js";
 
 const keys = makeKeys();
-const API = "https://api.github.com";
 const acme = { owner: "acme", repo: "api" };
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
@@ -31,9 +31,18 @@ function setup(options: { timeoutMs?: number } = {}): {
 } {
   const mint = tokenEndpoint(keys, () => new Date(Date.now() + 3_600_000));
   server.use(mint.handler);
-  const tokens = createInstallationTokenProvider({ appId: APP_ID, privateKey: keys.pkcs1Pem });
-  return { client: createGithubClient({ tokens, ...options }), mint };
+  const tokens = createInstallationTokenProvider({
+    baseUrl: API,
+    appId: APP_ID,
+    privateKey: keys.pkcs1Pem,
+  });
+  return { client: createGithubClient({ tokens, baseUrl: API, ...options }), mint };
 }
+
+// The tests use a fake http base URL (see msw.ts); production must still talk to GitHub over https.
+it("defaults to https://api.github.com", () => {
+  expect(DEFAULT_BASE_URL).toBe("https://api.github.com");
+});
 
 async function failure(promise: Promise<unknown>): Promise<GithubError> {
   try {

@@ -6,7 +6,7 @@ import { HttpResponse, http } from "msw";
 import { createInstallationTokenProvider } from "../../src/github/app-auth.js";
 import { GithubError } from "../../src/github/errors.js";
 import { FAKE_INSTALLATION_ID, FAKE_INSTALLATION_TOKEN } from "./fixtures.js";
-import { APP_ID, makeKeys, server, tokenEndpoint } from "./msw.js";
+import { API, APP_ID, makeKeys, server, tokenEndpoint } from "./msw.js";
 
 const keys = makeKeys();
 const MINUTE = 60_000;
@@ -37,6 +37,7 @@ describe("createInstallationTokenProvider", () => {
       );
       server.use(endpoint.handler);
       const tokens = createInstallationTokenProvider({
+        baseUrl: API,
         appId: APP_ID,
         privateKey: pem,
         now: () => clock.now,
@@ -58,6 +59,7 @@ describe("createInstallationTokenProvider", () => {
     );
     server.use(endpoint.handler);
     const tokens = createInstallationTokenProvider({
+      baseUrl: API,
       appId: APP_ID,
       privateKey: keys.pkcs1Pem,
       now: () => clock.now,
@@ -74,7 +76,11 @@ describe("createInstallationTokenProvider", () => {
   it("makes one request for concurrent callers", async () => {
     const endpoint = tokenEndpoint(keys, () => new Date(Date.now() + 60 * MINUTE));
     server.use(endpoint.handler);
-    const tokens = createInstallationTokenProvider({ appId: APP_ID, privateKey: keys.pkcs1Pem });
+    const tokens = createInstallationTokenProvider({
+      baseUrl: API,
+      appId: APP_ID,
+      privateKey: keys.pkcs1Pem,
+    });
     await Promise.all([1, 2, 3].map(() => tokens.getToken(FAKE_INSTALLATION_ID)));
     expect(endpoint.requests()).toBe(1);
   });
@@ -82,7 +88,11 @@ describe("createInstallationTokenProvider", () => {
   it("mints a new token after invalidate", async () => {
     const endpoint = tokenEndpoint(keys, () => new Date(Date.now() + 60 * MINUTE));
     server.use(endpoint.handler);
-    const tokens = createInstallationTokenProvider({ appId: APP_ID, privateKey: keys.pkcs1Pem });
+    const tokens = createInstallationTokenProvider({
+      baseUrl: API,
+      appId: APP_ID,
+      privateKey: keys.pkcs1Pem,
+    });
     await tokens.getToken(FAKE_INSTALLATION_ID);
     tokens.invalidate(FAKE_INSTALLATION_ID);
     await tokens.getToken(FAKE_INSTALLATION_ID);
@@ -92,14 +102,22 @@ describe("createInstallationTokenProvider", () => {
   it("keeps a separate token per installation", async () => {
     const endpoint = tokenEndpoint(keys, () => new Date(Date.now() + 60 * MINUTE));
     server.use(endpoint.handler);
-    const tokens = createInstallationTokenProvider({ appId: APP_ID, privateKey: keys.pkcs1Pem });
+    const tokens = createInstallationTokenProvider({
+      baseUrl: API,
+      appId: APP_ID,
+      privateKey: keys.pkcs1Pem,
+    });
     await tokens.getToken("1");
     await tokens.getToken("2");
     expect(endpoint.requests()).toBe(2);
   });
 
   it("maps GitHub failures to typed errors", async () => {
-    const tokens = createInstallationTokenProvider({ appId: APP_ID, privateKey: keys.pkcs1Pem });
+    const tokens = createInstallationTokenProvider({
+      baseUrl: API,
+      appId: APP_ID,
+      privateKey: keys.pkcs1Pem,
+    });
     const cases: Array<[number, string]> = [
       [401, "unauthorized"],
       [404, "not_found"],
@@ -108,7 +126,7 @@ describe("createInstallationTokenProvider", () => {
     ];
     for (const [status, kind] of cases) {
       server.use(
-        http.post("https://api.github.com/app/installations/:id/access_tokens", () =>
+        http.post(`${API}/app/installations/:id/access_tokens`, () =>
           HttpResponse.json({ message: "SECRET-BODY-TEXT" }, { status }),
         ),
       );
@@ -119,7 +137,11 @@ describe("createInstallationTokenProvider", () => {
   });
 
   it("rejects a bad installation id without calling GitHub", async () => {
-    const tokens = createInstallationTokenProvider({ appId: APP_ID, privateKey: keys.pkcs1Pem });
+    const tokens = createInstallationTokenProvider({
+      baseUrl: API,
+      appId: APP_ID,
+      privateKey: keys.pkcs1Pem,
+    });
     for (const id of ["", "abc", "1/../2", "12 34"]) {
       expect((await failure(tokens.getToken(id))).kind, id).toBe("invalid_input");
     }
@@ -127,11 +149,15 @@ describe("createInstallationTokenProvider", () => {
 
   it("rejects a malformed GitHub reply and never leaks the key or JWT in errors", async () => {
     server.use(
-      http.post("https://api.github.com/app/installations/:id/access_tokens", () =>
+      http.post(`${API}/app/installations/:id/access_tokens`, () =>
         HttpResponse.json({ unexpected: true }, { status: 201 }),
       ),
     );
-    const tokens = createInstallationTokenProvider({ appId: APP_ID, privateKey: keys.pkcs8Pem });
+    const tokens = createInstallationTokenProvider({
+      baseUrl: API,
+      appId: APP_ID,
+      privateKey: keys.pkcs8Pem,
+    });
     const error = await failure(tokens.getToken(FAKE_INSTALLATION_ID));
     expect(error.kind).toBe("upstream");
     const body = keys.pkcs8Pem.split("\n")[1] ?? "";
@@ -139,7 +165,11 @@ describe("createInstallationTokenProvider", () => {
   });
 
   it("fails clearly when the private key is not a usable key", async () => {
-    const tokens = createInstallationTokenProvider({ appId: APP_ID, privateKey: "not a key" });
+    const tokens = createInstallationTokenProvider({
+      baseUrl: API,
+      appId: APP_ID,
+      privateKey: "not a key",
+    });
     const error = await failure(tokens.getToken(FAKE_INSTALLATION_ID));
     expect(error.kind).toBe("unauthorized");
     expect(error.message).not.toContain("not a key");

@@ -11,6 +11,14 @@ export const server = setupServer();
 
 export const APP_ID = "987654";
 
+/**
+ * Fake GitHub base URL for every test: plain http, on purpose. msw mocks https by faking the TLS
+ * handshake and hands out a fake session ticket; Node's fetch replays it on the next connection,
+ * which leaves an OpenSSL error queued after an aborted request and makes the next valid
+ * createPrivateKey fail (issue #23). The adapter code is the same for http and https.
+ */
+export const API = "http://api.github.test";
+
 export interface TestKeys {
   publicKey: KeyObject;
   pkcs1Pem: string;
@@ -42,23 +50,20 @@ export function tokenEndpoint(
 ): TokenEndpoint {
   const accepted: TokenEndpoint["accepted"] = [];
   let count = 0;
-  const handler = http.post(
-    "https://api.github.com/app/installations/:id/access_tokens",
-    async ({ request }) => {
-      count += 1;
-      const jwt = request.headers.get("authorization")?.replace(/^Bearer /, "") ?? "";
-      try {
-        const { payload } = await jwtVerify(jwt, keys.publicKey, {
-          issuer: APP_ID,
-          algorithms: ["RS256"],
-          currentDate: new Date(now()),
-        });
-        accepted.push({ iss: payload.iss, iat: payload.iat, exp: payload.exp });
-      } catch {
-        return HttpResponse.json({ message: "Bad credentials" }, { status: 401 });
-      }
-      return HttpResponse.json(installationTokenBody(expiresAt()), { status: 201 });
-    },
-  );
+  const handler = http.post(`${API}/app/installations/:id/access_tokens`, async ({ request }) => {
+    count += 1;
+    const jwt = request.headers.get("authorization")?.replace(/^Bearer /, "") ?? "";
+    try {
+      const { payload } = await jwtVerify(jwt, keys.publicKey, {
+        issuer: APP_ID,
+        algorithms: ["RS256"],
+        currentDate: new Date(now()),
+      });
+      accepted.push({ iss: payload.iss, iat: payload.iat, exp: payload.exp });
+    } catch {
+      return HttpResponse.json({ message: "Bad credentials" }, { status: 401 });
+    }
+    return HttpResponse.json(installationTokenBody(expiresAt()), { status: 201 });
+  });
   return { handler, accepted, requests: () => count };
 }
