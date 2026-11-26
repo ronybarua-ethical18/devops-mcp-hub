@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import * as z from "zod/v4";
 import { INTERNAL_ERROR_TEXT } from "../src/errors.js";
 import { createHubServer, TOOLS_LIST_CACHE_HINT } from "../src/registry.js";
+import type { HubResourceTemplate } from "../src/resource.js";
 import { UNTRUSTED_NOTICE } from "../src/result.js";
 import { defineTool, type HubTool } from "../src/tool.js";
 import { connect, lastResultWith, type Connected } from "./helpers/connect.js";
@@ -255,6 +256,39 @@ describe("createHubServer definition checks", () => {
     ]) {
       expect(make([withOutput(schema)])).toThrow(/github_out/);
     }
+  });
+
+  it("rejects a resource with a loose output schema or a bad name", () => {
+    const resource = (name: string, outputSchema: z.ZodObject): HubResourceTemplate<Ctx> => ({
+      name,
+      title: "Fake",
+      description: "A fake resource.",
+      uriTemplate: "github://{owner}/{repo}/things/{id}",
+      outputSchema,
+      read: async () => ({}),
+    });
+    const withResources = (resources: HubResourceTemplate<Ctx>[]) => () =>
+      createHubServer({ tools: [ok("github_a")], resources, context, logError: vi.fn() });
+
+    expect(withResources([resource("github_loose", z.looseObject({}))])).toThrow(/github_loose/);
+    expect(withResources([resource("githubThing", z.object({}))])).toThrow(/githubThing/);
+    expect(withResources([resource("github_a", z.object({}))])).toThrow(/github_a/);
+    expect(withResources([resource("github_thing", z.object({}))])).not.toThrow();
+  });
+
+  // The read result is sent as { notice, ...output }, so an output field named notice would replace the notice.
+  it("rejects a resource whose output has a top-level notice field", () => {
+    const resource: HubResourceTemplate<Ctx> = {
+      name: "github_noticed",
+      title: "Fake",
+      description: "A fake resource.",
+      uriTemplate: "github://{owner}/{repo}/things/{id}",
+      outputSchema: z.object({ notice: z.string() }),
+      read: async () => ({ notice: "x" }),
+    };
+    expect(() =>
+      createHubServer({ tools: [], resources: [resource], context, logError: vi.fn() }),
+    ).toThrow(/github_noticed.*notice/);
   });
 
   it("accepts good definitions", () => {

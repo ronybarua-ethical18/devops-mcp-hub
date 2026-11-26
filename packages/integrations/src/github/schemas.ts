@@ -36,7 +36,8 @@ const pullSchema = z.object({
 export const pullListSchema = z.array(pullSchema);
 
 export const commitSchema = z.object({
-  sha: z.string(),
+  // A full SHA only: the hub quotes it in summaries, so it must not be free text.
+  sha: z.string().regex(/^[0-9a-f]{40}$/),
   html_url: z.string(),
   commit: z.object({
     message: z.string(),

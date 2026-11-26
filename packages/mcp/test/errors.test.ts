@@ -3,7 +3,8 @@
 
 import { GithubReadError, HINTS } from "@hub/core";
 import { describe, expect, it, vi } from "vitest";
-import { INTERNAL_ERROR_TEXT, toErrorResult } from "../src/errors.js";
+import { ResourceNotFoundError } from "@modelcontextprotocol/server";
+import { INTERNAL_ERROR_TEXT, toErrorResult, toResourceError } from "../src/errors.js";
 
 const textOf = (result: ReturnType<typeof toErrorResult>): string =>
   result.content[0]?.type === "text" ? result.content[0].text : "";
@@ -70,6 +71,45 @@ describe("toErrorResult", () => {
     });
     const result = toErrorResult(new Error("boom"), "github_get_commit", logError);
     expect(textOf(result)).toBe(INTERNAL_ERROR_TEXT);
+    expect(logError).toHaveBeenCalledTimes(1);
+  });
+
+  it("toResourceError maps kinds to wire codes with fixed text", () => {
+    const uri = "github://acme/api/commits/main";
+    const invalid = toResourceError(
+      new GithubReadError("invalid_input", HINTS.sha),
+      uri,
+      "github_commit",
+      vi.fn(),
+    );
+    expect(invalid.code).toBe(-32602);
+    expect(invalid.message).toBe(`Invalid input (invalid_input).\n${HINTS.sha}`);
+
+    for (const kind of ["repo_not_allowed", "not_found"] as const) {
+      const hint = kind === "not_found" ? HINTS.commit_not_found : HINTS.repo_not_allowed;
+      const missing = toResourceError(
+        new GithubReadError(kind, hint),
+        uri,
+        "github_commit",
+        vi.fn(),
+      );
+      expect(missing).toBeInstanceOf(ResourceNotFoundError);
+      expect(missing.message).toContain(`(${kind}).\n${hint}`);
+    }
+
+    const limited = toResourceError(
+      new GithubReadError("rate_limited", HINTS.rate_limited, 30),
+      uri,
+      "github_commit",
+      vi.fn(),
+    );
+    expect(limited.code).toBe(-32603);
+    expect(limited.message).toContain(HINTS.rate_limited);
+
+    const logError = vi.fn();
+    const hidden = toResourceError(new Error("postgres://u:pw@h"), uri, "github_commit", logError);
+    expect(hidden.code).toBe(-32603);
+    expect(hidden.message).toBe(INTERNAL_ERROR_TEXT);
     expect(logError).toHaveBeenCalledTimes(1);
   });
 
