@@ -172,6 +172,10 @@ function checkDefinitions<Ctx>(
   for (const resource of resources) {
     checkName("Resource", resource.name);
     checkOutput("Resource", resource.name, resource.outputSchema);
+    // Reads are sent as { notice, ...output }: an output field named notice would replace the notice.
+    if ("notice" in resource.outputSchema.shape) {
+      throw new Error(`Resource ${resource.name} must not have a top-level notice field`);
+    }
   }
 }
 

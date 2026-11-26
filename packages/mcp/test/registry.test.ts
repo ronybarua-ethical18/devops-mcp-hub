@@ -276,6 +276,21 @@ describe("createHubServer definition checks", () => {
     expect(withResources([resource("github_thing", z.object({}))])).not.toThrow();
   });
 
+  // The read result is sent as { notice, ...output }, so an output field named notice would replace the notice.
+  it("rejects a resource whose output has a top-level notice field", () => {
+    const resource: HubResourceTemplate<Ctx> = {
+      name: "github_noticed",
+      title: "Fake",
+      description: "A fake resource.",
+      uriTemplate: "github://{owner}/{repo}/things/{id}",
+      outputSchema: z.object({ notice: z.string() }),
+      read: async () => ({ notice: "x" }),
+    };
+    expect(() =>
+      createHubServer({ tools: [], resources: [resource], context, logError: vi.fn() }),
+    ).toThrow(/github_noticed.*notice/);
+  });
+
   it("accepts good definitions", () => {
     expect(make([ok("hub_whoami"), ok("github_list_pull_requests")])).not.toThrow();
 

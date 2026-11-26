@@ -61,7 +61,7 @@ describe("github://{owner}/{repo}/commits/{sha}", () => {
     expect(JSON.stringify(wire)).not.toContain("ghs_secret");
   });
 
-  it("another org's commit looks exactly like a missing one", async () => {
+  it("another org's commit gets the same error code as a missing one", async () => {
     const other = await read(
       "github://other/secret/commits/abc1234",
       throwing(new GithubReadError("repo_not_allowed", HINTS.repo_not_allowed)),
@@ -104,6 +104,25 @@ describe("github://{owner}/{repo}/commits/{sha}", () => {
     expect(last.error?.message).toBe(INTERNAL_ERROR_TEXT);
     expect(JSON.stringify(wire)).not.toContain("postgres://");
     expect(logError).toHaveBeenCalledWith(error, { tool: "github_commit" });
+  });
+
+  it("output that fails the schema is an internal error with fixed text, and is logged", async () => {
+    const logError = vi.fn();
+    const getCommit = vi.fn(async () => ({ ...detail, filesShown: "SECRET-REPLY-VALUE" }));
+    const { last, wire } = await read("github://acme/api/commits/abc1234", getCommit, logError);
+    expect(last.error?.code).toBe(-32603);
+    expect(last.error?.message).toBe(INTERNAL_ERROR_TEXT);
+    expect(JSON.stringify(wire)).not.toContain("SECRET-REPLY-VALUE");
+    expect(logError).toHaveBeenCalledWith(expect.anything(), { tool: "github_commit" });
+  });
+
+  // The URI is client-written: an encoded slash must reach the core still encoded, where the repo check refuses it.
+  it("passes a percent-encoded owner to the core undecoded", async () => {
+    const getCommit = throwing(new GithubReadError("invalid_input", HINTS.repo));
+    const { last } = await read("github://acme%2Fx/api/commits/abc1234", getCommit);
+    expect(getCommit.mock.calls[0]?.[0]).toStrictEqual({ repo: "acme%2Fx/api", sha: "abc1234" });
+    expect(last.error?.code).toBe(-32602);
+    expect(last.error?.message.endsWith(HINTS.repo)).toBe(true);
   });
 
   it("lists the template with the private cache hint", async () => {

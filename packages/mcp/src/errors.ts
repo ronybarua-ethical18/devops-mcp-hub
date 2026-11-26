@@ -13,7 +13,7 @@ import {
 export type LogError = (error: unknown, details: { tool: string }) => void;
 
 export const INTERNAL_ERROR_TEXT =
-  "The hub hit an internal error while running this tool.\nTry again later. If it keeps failing, ask an admin to check the hub logs.";
+  "The hub hit an internal error while handling this request.\nTry again later. If it keeps failing, ask an admin to check the hub logs.";
 
 /** The text the model sees for any thrown value. Known errors keep their fixed message and hint; anything else is logged and hidden. */
 export function errorText(error: unknown, name: string, logError: LogError): string {
