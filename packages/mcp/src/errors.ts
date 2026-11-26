@@ -18,8 +18,19 @@ export function toErrorResult(error: unknown, tool: string, logError: LogError):
     return errorText(`${error.message} (${error.kind}).\n${error.hint}${wait}`);
   }
   // Never error.message: an unknown error can carry a URL, a token or a provider reply.
-  logError(error, { tool });
+  neverThrows(logError)(error, { tool });
   return errorText(INTERNAL_ERROR_TEXT);
+}
+
+/** A LogError that swallows its own failure: a thrown logger error would reach the model through the SDK. */
+export function neverThrows(logError: LogError): LogError {
+  return (error, details) => {
+    try {
+      logError(error, details);
+    } catch {
+      // Nothing safe to report: the logger itself is the way out, and its message may hold internals.
+    }
+  };
 }
 
 function errorText(text: string): CallToolResult {

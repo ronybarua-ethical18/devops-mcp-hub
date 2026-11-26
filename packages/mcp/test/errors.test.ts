@@ -64,6 +64,15 @@ describe("toErrorResult", () => {
     }
   });
 
+  it("a logger that throws does not escape", () => {
+    const logError = vi.fn(() => {
+      throw new Error("logger down at https://logs.internal/?key=secret");
+    });
+    const result = toErrorResult(new Error("boom"), "github_get_commit", logError);
+    expect(textOf(result)).toBe(INTERNAL_ERROR_TEXT);
+    expect(logError).toHaveBeenCalledTimes(1);
+  });
+
   it("does not echo the caller's input", () => {
     const result = toErrorResult(
       new GithubReadError("invalid_input", HINTS.repo),

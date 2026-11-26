@@ -143,6 +143,25 @@ describe("tools/call", () => {
     expect(logError).toHaveBeenCalledWith(expect.any(Error), { tool: "github_x" });
   });
 
+  // The SDK sends a thrown message to the model as is, so a failing logger must not escape the handler.
+  it("a logger that throws never reaches the wire", async () => {
+    const logError = vi.fn(() => {
+      throw new Error("logger down at https://logs.internal/?key=secret");
+    });
+    const throwing = fakeTool("github_x", async () => {
+      throw new Error("boom");
+    });
+    const badOutput = fakeTool("github_y", async () => ({ repo: 5 }));
+    const { client, wire } = await serve([throwing, badOutput], logError);
+    for (const name of ["github_x", "github_y"]) {
+      const result = await client.callTool({ name, arguments: {} });
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toBe(INTERNAL_ERROR_TEXT);
+    }
+    expect(JSON.stringify(wire)).not.toContain("logs.internal");
+    expect(logError).toHaveBeenCalledTimes(2);
+  });
+
   it("undeclared output fields are stripped", async () => {
     const tool = fakeTool("github_a", async () => ({
       repo: "acme/api",

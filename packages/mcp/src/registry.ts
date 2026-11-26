@@ -4,7 +4,7 @@
 import { HUB_NAME } from "@hub/core";
 import { McpServer, type CallToolResult } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
-import { INTERNAL_ERROR_TEXT, toErrorResult, type LogError } from "./errors.js";
+import { INTERNAL_ERROR_TEXT, neverThrows, toErrorResult, type LogError } from "./errors.js";
 import { toToolResult, withoutUntrusted } from "./result.js";
 import type { HubTool } from "./tool.js";
 
@@ -24,7 +24,8 @@ export interface HubServerOptions<Ctx> {
 
 /** A fresh McpServer with the tools registered in name order. Throws on a bad definition. */
 export function createHubServer<Ctx>(options: HubServerOptions<Ctx>): McpServer {
-  const { tools, context, logError } = options;
+  const { tools, context } = options;
+  const logError = neverThrows(options.logError);
   checkDefinitions(tools);
 
   const server = new McpServer(
