@@ -21,7 +21,10 @@ export interface HubToolDefinition<Ctx, In extends AnyObjectSchema, Out extends 
   inputSchema: In;
   outputSchema: Out;
   annotations: HubToolAnnotations;
-  /** Line 1 of the text summary. Gets the output without untrusted_content, so it cannot quote provider text. */
+  /**
+   * Line 1 of the text summary. Gets the output without untrusted_content, so it cannot quote provider text.
+   * Use only counts, numbers, SHAs, repo names the core checked and ids from ctx: never author, authorLogin, url or stored repo refs.
+   */
   summarize(output: Omit<z.infer<Out>, "untrusted_content">): string;
   run(input: z.infer<In>, ctx: Ctx): Promise<z.infer<Out>>;
 }
